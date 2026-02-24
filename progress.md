@@ -307,3 +307,25 @@
   - `$turn->player->increment('score', $score)` is the atomic increment pattern — avoids race conditions vs `$player->score += $score; $player->save()`
   - Adding `round_complete` to the games enum now saves another migration later (US-015/016 need it)
 ---
+
+## 2026-02-24 - US-014
+- Created `TurnController::results()` action (GET `/games/{code}/results/{turnId}`): returns `games/Results` Inertia page with turn data (player name, topic, grade, score, feedback, actual_explanation), scoreboard (players sorted by score desc), and isHost flag
+- Updated `TurnController::playState()` to include `completedTurnId` in JSON when `game.status === 'grading_complete'` (finds latest `complete` turn by `updated_at desc`)
+- Added route `GET /games/{code}/results/{turnId}` → `TurnController::results` to `routes/web.php`
+- Added dev helper route `GET /dev/completed-turn` → `DevController::completedTurn`: logs in as `host-veteran@dev.test` and redirects to the first completed turn's results page for Playwright testing
+- Created `resources/js/pages/games/Results.vue`:
+  - Host view (AppLayout): shows turn results with grade badge (A=green/B=blue/C=yellow/D=orange/F=red), score, feedback, actual explanation, scoreboard, and "Next Player →" button
+  - Non-host view: same results but shows "Waiting for host to continue…" instead of the button
+  - Grading failed fallback: "Grading failed — no score awarded" when `status === 'grading_failed'` or grade is null
+- Updated `Play.vue` polling: detects `gameStatus === 'grading_complete'` with a `completedTurnId` → navigates to results via `window.location.href`
+- Active player now starts polling after successful audio upload (when `recordingPhase = 'done'`) so they also navigate to results when grading completes
+- 7 PEST feature tests in `ResultsTest.php`: host/guest access, score sorting, grading_failed, auth check, play-state completedTurnId presence
+- Playwright E2E test in `tests/e2e/results.spec.ts` using `/dev/completed-turn` helper route
+- **Files changed:** `TurnController.php`, `DevController.php`, `routes/web.php`, `routes/dev.php`, `resources/js/pages/games/Results.vue`, `resources/js/pages/games/Play.vue`, `tests/Feature/ResultsTest.php`, `tests/e2e/results.spec.ts`
+- **Learnings for future iterations:**
+  - `playState()` needed a new `completedTurnId` field: query `turns` for the most recently updated `complete` turn when `game.status === 'grading_complete'`
+  - Active player skips polling in `onMounted` (returns early) — must explicitly start `pollInterval` after audio upload so they can navigate to results
+  - Dev helper `/dev/completed-turn` pattern (log in + redirect to a specific resource) is very useful for Playwright tests that need to bypass auth and find a known resource
+  - Results page uses `window.location.href` (full page load) rather than Inertia `router.visit()` to avoid issues with the polling interval + component lifecycle
+  - `computed` for grade badge CSS class is the clean way to handle conditional styling for 5 grade values
+---
