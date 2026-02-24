@@ -23,6 +23,7 @@ const props = defineProps<{
     submittedCount: number;
     totalCount: number;
     players: { name: string; has_submitted: boolean }[];
+    hostCredits: number | null;
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -169,9 +170,14 @@ async function pollStatus() {
                             {{ startForm.errors.game }}
                         </p>
 
+                        <div v-if="hostCredits !== null && hostCredits <= 0" class="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                            Add credits to start a game.
+                            <a href="/billing" class="underline font-medium ml-1">Go to Billing →</a>
+                        </div>
+
                         <Button
                             class="w-full"
-                            :disabled="startForm.processing"
+                            :disabled="startForm.processing || (hostCredits !== null && hostCredits <= 0)"
                             @click="startGame"
                         >
                             {{ startForm.processing ? 'Starting…' : 'Start Game' }}

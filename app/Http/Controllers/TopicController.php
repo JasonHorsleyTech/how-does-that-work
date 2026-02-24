@@ -27,6 +27,12 @@ class TopicController extends Controller
         $submittedCount = $allPlayers->where('has_submitted', true)->count();
         $totalCount = $allPlayers->count();
 
+        // Pass host credits so the Start Game button can be disabled when credits = 0
+        $hostCredits = null;
+        if ($player->is_host && $request->user()) {
+            $hostCredits = $request->user()->credits;
+        }
+
         return Inertia::render('games/Submit', [
             'game' => [
                 'id' => $game->id,
@@ -42,6 +48,7 @@ class TopicController extends Controller
             'submittedCount' => $submittedCount,
             'totalCount' => $totalCount,
             'players' => $allPlayers->map(fn ($p) => ['name' => $p->name, 'has_submitted' => (bool) $p->has_submitted]),
+            'hostCredits' => $hostCredits,
         ]);
     }
 

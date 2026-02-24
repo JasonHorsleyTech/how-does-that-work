@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GameController;
 use App\Http\Controllers\JoinController;
+use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\TopicController;
 use App\Http\Controllers\TurnController;
 use Illuminate\Support\Facades\Route;
@@ -22,7 +24,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('games', [GameController::class, 'store'])->name('games.store');
     Route::post('games/{code}/start-submission', [GameController::class, 'startSubmission'])->name('games.start-submission');
     Route::post('games/{code}/start-game', [GameController::class, 'startGame'])->name('games.start-game');
+
+    Route::get('billing', [BillingController::class, 'index'])->name('billing');
+    Route::post('billing/checkout', [BillingController::class, 'checkout'])->name('billing.checkout');
+    Route::get('billing/success', [BillingController::class, 'success'])->name('billing.success');
 });
+
+// Stripe webhook — no CSRF, no auth
+Route::post('stripe/webhook', [StripeWebhookController::class, 'handle'])->name('stripe.webhook');
 
 // Lobby accessible to authenticated hosts and guest players (session-based)
 Route::get('games/{code}/lobby', [GameController::class, 'lobby'])->name('games.lobby');

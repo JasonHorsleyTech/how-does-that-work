@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Turn;
+use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -77,6 +78,12 @@ PROMPT;
         ]);
 
         $turn->player->increment('score', $score);
+
+        // Deduct 1 credit from the host for this grading call
+        $host = User::find($turn->game->host_user_id);
+        if ($host && $host->credits > 0) {
+            $host->decrement('credits');
+        }
 
         $turn->game->update([
             'status' => 'grading_complete',

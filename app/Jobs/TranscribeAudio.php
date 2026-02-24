@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Turn;
+use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -43,6 +44,13 @@ class TranscribeAudio implements ShouldQueue
             }
 
             $this->turn->update(['transcript' => $transcript]);
+
+            // Deduct 1 credit from the host for this transcription call
+            $this->turn->load('game');
+            $host = User::find($this->turn->game->host_user_id);
+            if ($host && $host->credits > 0) {
+                $host->decrement('credits');
+            }
 
             dispatch(new GradeTurn($this->turn));
         } catch (Throwable $e) {

@@ -159,6 +159,10 @@ class GameController extends Controller
             return back()->withErrors(['game' => 'Game is not in the submission phase.']);
         }
 
+        if ($request->user()->credits <= 0) {
+            return back()->withErrors(['game' => 'Add credits to start a game.']);
+        }
+
         $game->update([
             'status' => 'playing',
             'state_updated_at' => now(),
