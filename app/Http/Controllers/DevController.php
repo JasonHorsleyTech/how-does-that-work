@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Game;
 use App\Models\Player;
+use App\Models\Turn;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -63,6 +64,35 @@ class DevController extends Controller
         $request->session()->put('player_id', $player->id);
 
         return redirect("/games/{$code}/lobby");
+    }
+
+    public function completedTurn()
+    {
+        if (app()->environment('production')) {
+            abort(404);
+        }
+
+        $veteran = User::where('email', 'host-veteran@dev.test')->firstOrFail();
+        Auth::loginUsingId($veteran->id);
+
+        $game = Game::where('host_user_id', $veteran->id)
+            ->where('status', 'complete')
+            ->first();
+
+        if (! $game) {
+            abort(404, 'No completed game found for host-veteran. Please run db:seed first.');
+        }
+
+        $turn = Turn::where('game_id', $game->id)
+            ->where('status', 'complete')
+            ->orderBy('turn_order')
+            ->first();
+
+        if (! $turn) {
+            abort(404, 'No completed turn found. Please run db:seed first.');
+        }
+
+        return redirect("/games/{$game->code}/results/{$turn->id}");
     }
 
     private function randomGuestName(): string

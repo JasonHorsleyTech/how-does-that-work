@@ -247,6 +247,10 @@ async function uploadAudio() {
 
         if (response.ok) {
             recordingPhase.value = 'done';
+            // Start polling so the active player also navigates to results when grading completes
+            if (!pollInterval) {
+                pollInterval = setInterval(pollState, 3000);
+            }
         } else {
             recordingPhase.value = 'error';
         }
@@ -299,6 +303,12 @@ async function pollState() {
         });
         if (response.ok) {
             const data = await response.json();
+
+            // Navigate to results when grading is complete
+            if (data.gameStatus === 'grading_complete' && data.completedTurnId) {
+                window.location.href = `/games/${props.game.code}/results/${data.completedTurnId}`;
+                return;
+            }
 
             if (data.turnStatus === 'recording' && localTurnStatus.value === 'choosing') {
                 // Topic was just chosen — show reveal + countdown in place

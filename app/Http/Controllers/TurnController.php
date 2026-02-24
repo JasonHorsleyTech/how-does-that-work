@@ -125,6 +125,56 @@ class TurnController extends Controller
         return redirect("/games/{$game->code}/play");
     }
 
+    public function results(string $code, int $turnId, Request $request)
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        [$player] = $this->resolvePlayer($game, $request);
+
+        if (! $player) {
+            abort(403);
+        }
+
+        $turn = $game->turns()
+            ->where('id', $turnId)
+            ->with(['player', 'topic'])
+            ->firstOrFail();
+
+        $players = $game->players()
+            ->orderByDesc('score')
+            ->get(['id', 'name', 'score', 'is_host']);
+
+        return Inertia::render('games/Results', [
+            'game' => [
+                'id' => $game->id,
+                'code' => $game->code,
+                'status' => $game->status,
+                'current_round' => $game->current_round,
+            ],
+            'player' => [
+                'id' => $player->id,
+                'name' => $player->name,
+                'is_host' => $player->is_host,
+            ],
+            'turn' => [
+                'id' => $turn->id,
+                'player_name' => $turn->player->name,
+                'topic_text' => $turn->topic?->text,
+                'status' => $turn->status,
+                'grade' => $turn->grade,
+                'score' => $turn->score,
+                'feedback' => $turn->feedback,
+                'actual_explanation' => $turn->actual_explanation,
+            ],
+            'players' => $players->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'score' => $p->score,
+                'is_host' => $p->is_host,
+            ]),
+        ]);
+    }
+
     public function playState(string $code, Request $request): JsonResponse
     {
         $game = Game::where('code', strtoupper($code))->firstOrFail();
@@ -146,6 +196,7 @@ class TurnController extends Controller
         $chosenTopicPlayerName = null;
         $timeRemaining = null;
         $recordingStarted = false;
+        $completedTurnId = null;
 
         if ($currentTurn && $currentTurn->status === 'recording' && $currentTurn->topic_id) {
             $topic = Topic::find($currentTurn->topic_id);
@@ -159,6 +210,14 @@ class TurnController extends Controller
             }
         }
 
+        if ($game->status === 'grading_complete') {
+            $completedTurn = $game->turns()
+                ->where('status', 'complete')
+                ->orderByDesc('updated_at')
+                ->first();
+            $completedTurnId = $completedTurn?->id;
+        }
+
         return response()->json([
             'gameStatus' => $game->status,
             'turnStatus' => $currentTurn?->status,
@@ -169,6 +228,7 @@ class TurnController extends Controller
             'chosenTopicPlayerName' => $chosenTopicPlayerName,
             'recordingStarted' => $recordingStarted,
             'timeRemaining' => $timeRemaining,
+            'completedTurnId' => $completedTurnId,
         ]);
     }
 
