@@ -44,3 +44,19 @@
   - MySQL auto-indexes FK columns, so explicit `->index()` after FK definition is unnecessary
   - `phpunit.xml` already properly isolates tests to SQLite in-memory — tests don't need MySQL
 ---
+
+## 2026-02-24 - US-023
+- Replaced the default Laravel starter kit Welcome.vue with a custom branded game homepage
+- New page includes: game title, one-line tagline, "Host a Game" CTA, "Join a Game" form, and 4-step How to Play section
+- "Host a Game" button: links to `/register` for guests (or `/dashboard` if authenticated), respects `canRegister` Fortify feature flag
+- "Join a Game" form: text input + Join button that navigates to `/join/{code}` via `router.visit()` on submit/Enter
+- Used existing Reka UI components: `Button` (with `asChild` + `Link` for navigation), `Input` (with `v-model`)
+- Responsive layout with Tailwind — single column on mobile, two-column grid for How to Play on sm+
+- **Files changed:** `resources/js/pages/Welcome.vue`
+- **Learnings for future iterations:**
+  - `Button as-child` + `<Link>` inside is the idiomatic Reka UI pattern for link-styled buttons (renders as `<a>` with button classes)
+  - Inertia's `router.visit(url)` is the SPA-friendly way to navigate programmatically
+  - Route helpers from `@/routes` return RouteDefinition objects (`{ url, method }`) — Inertia's `Link :href` accepts these objects directly via Wayfinder integration
+  - Input component passes unknown attrs to the native `<input>` via Vue attribute inheritance — `maxlength`, `@keyup.enter`, etc. work without extra wiring
+  - The `canRegister` prop (from Fortify Features) controls whether the Register link appears; always respect it for the Host button
+---
