@@ -10,9 +10,9 @@ return new class extends Migration
     {
         Schema::create('turns', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('game_id')->constrained('games')->index();
-            $table->foreignId('player_id')->constrained('players')->index();
-            $table->foreignId('topic_id')->nullable()->constrained('topics')->nullOnDelete()->index();
+            $table->foreignId('game_id')->constrained('games');
+            $table->foreignId('player_id')->constrained('players');
+            $table->foreignId('topic_id')->nullable()->constrained('topics')->nullOnDelete();
             $table->unsignedInteger('round_number');
             $table->unsignedInteger('turn_order');
             $table->enum('status', ['pending', 'choosing', 'recording', 'grading', 'complete'])->default('pending');

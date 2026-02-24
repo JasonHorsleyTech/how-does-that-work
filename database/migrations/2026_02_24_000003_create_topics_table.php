@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('topics', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('game_id')->constrained('games')->index();
-            $table->foreignId('submitted_by_player_id')->constrained('players')->index();
+            $table->foreignId('game_id')->constrained('games');
+            $table->foreignId('submitted_by_player_id')->constrained('players');
             $table->string('text', 120);
             $table->boolean('is_used')->default(false);
             $table->timestamps();

@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('players', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('game_id')->constrained('games')->index();
-            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete()->index();
+            $table->foreignId('game_id')->constrained('games');
+            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('name');
             $table->boolean('is_host')->default(false);
             $table->boolean('has_submitted')->default(false);

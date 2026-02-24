@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('games', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('host_user_id')->constrained('users')->index();
+            $table->foreignId('host_user_id')->constrained('users');
             $table->string('code', 6)->unique();
             $table->enum('status', ['lobby', 'submitting', 'playing', 'grading', 'complete'])->default('lobby');
             $table->unsignedInteger('current_round')->default(1);
