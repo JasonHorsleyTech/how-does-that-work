@@ -413,3 +413,27 @@
   - The existing `tests/Feature/Auth/RegistrationTest.php` (from Fortify starter kit) only tests basic registration — our new `RegistrationTest.php` adds dashboard-redirect and validation tests
   - Pint flags `no_unused_imports` in test files too — don't import `use App\Models\User` unless you actually reference it by name
 ---
+
+## 2026-02-24 - US-020
+- Installed `laravel/cashier` (v16) and published config/migrations
+- Added `Billable` trait to `User` model
+- Created `BillingController` with `index()` (billing page), `checkout()` (Stripe Checkout via `checkoutCharge()`), and `success()` actions
+- Created `StripeWebhookController` with custom `handle()` that verifies Stripe signature when `STRIPE_WEBHOOK_SECRET` is set; skips verification in test env (secret not set in phpunit.xml)
+- Added CSRF exemption for `stripe/webhook` route in `bootstrap/app.php` via `$middleware->validateCsrfTokens(except: ['stripe/webhook'])`
+- Created `Billing.vue` and `BillingSuccess.vue` pages using AppLayout
+- Updated `TopicController::show()` to pass `hostCredits` prop (null for guests, int for hosts)
+- Updated `Submit.vue` to disable "Start Game" button and show a billing link when `hostCredits <= 0`
+- Updated `GameController::startGame()` to check credits server-side before starting (returns error if 0)
+- Updated `GradeTurn` and `TranscribeAudio` jobs to deduct 1 credit from the host after each successful API call; never goes below 0
+- Added `credits => 100` default to `UserFactory` so test users have credits by default (fixes downstream tests that expect startGame to succeed)
+- Added Stripe keys (`STRIPE_KEY`, `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`) to `.env.example`
+- 13 PEST tests in `BillingTest.php` covering: billing page auth, start-game credit check, hostCredits prop, webhook increment, webhook edge cases, signature check, credit deduction in GradeTurn
+- **Files changed:** `composer.json/lock`, `config/cashier.php`, 5 Cashier migrations, `User.php`, `GameController.php`, `TopicController.php`, `GradeTurn.php`, `TranscribeAudio.php`, `bootstrap/app.php`, `routes/web.php`, `Submit.vue`, `UserFactory.php`, `BillingController.php`, `StripeWebhookController.php`, `Billing.vue`, `BillingSuccess.vue`, `BillingTest.php`
+- **Learnings for future iterations:**
+  - `$middleware->validateCsrfTokens(except: ['stripe/webhook'])` is the Laravel 11 way to exempt a route from CSRF — goes in `bootstrap/app.php`'s `withMiddleware()` closure
+  - Stripe webhook signature verification: when `STRIPE_WEBHOOK_SECRET` is empty/null (as in phpunit.xml), skip `Webhook::constructEvent()` and parse the payload directly — this makes webhooks testable without real Stripe
+  - `user->checkoutCharge($amountCents, $name, $qty, $options)` is the Cashier method for inline one-time Stripe Checkout (no pre-configured Price ID needed); pass `client_reference_id` to identify the user in the webhook
+  - `UserFactory` defaults should reflect a "happy path" test user (credits: 100) — tests that specifically need 0 credits should set it explicitly with `User::factory()->create(['credits' => 0])`
+  - Credit deduction in jobs: use `if ($host && $host->credits > 0) { $host->decrement('credits'); }` — guard prevents going below zero
+  - Cashier v16 migrations: `cashier:install` command doesn't exist; use `php artisan vendor:publish --tag="cashier-migrations"` to publish them
+---
