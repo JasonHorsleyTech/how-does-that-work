@@ -169,3 +169,28 @@
   - For guest-facing pages (no auth), use `AuthLayout` — it's a clean centered card layout without requiring login
   - Passing errors as Inertia props (for pre-load validation) is cleaner than session flash for read-only error states
 ---
+
+## 2026-02-24 - US-007
+- Added `topic_choices` JSON column to the `turns` table via new migration
+- Updated `Turn` model: added `topic_choices` to `$fillable` and cast as `array`
+- Created `app/Services/TurnAssignmentService` with `assignTurns(Game $game)` method:
+  - Fetches all non-host players, shuffles them to determine turn order
+  - Maintains an in-memory `claimedIds` set to prevent the same topic appearing in two turns' choices
+  - For each round (1..max_rounds), for each player: picks up to 2 eligible topics (not submitted by that player, not already claimed), skips player if 0 eligible
+  - Creates `Turn` records with `status=pending`, `topic_choices=[id1, id2]`
+- Wired `TurnAssignmentService` into `GameController::startGame()` via dependency injection — called after game transitions to `playing`
+- Created 7 PEST unit tests in `tests/Unit/Services/TurnAssignmentServiceTest.php`:
+  - No turn assigns a player their own topic
+  - No topic appears in two different turns
+  - Algorithm works with 2, 5, and 10 players
+  - Generates turns for both rounds when max_rounds=2
+  - Skips player turn when 0 eligible topics remain
+- **Files changed:** `database/migrations/2026_02_24_000006_add_topic_choices_to_turns_table.php`, `app/Models/Turn.php`, `app/Services/TurnAssignmentService.php`, `app/Http/Controllers/GameController.php`, `tests/Unit/Services/TurnAssignmentServiceTest.php`
+- **Learnings for future iterations:**
+  - `TurnAssignmentService` uses a Collection from memory (not re-querying DB per iteration) for efficiency — load topics once, filter in PHP
+  - The `claimedIds` array grows during generation; `in_array()` is fine for game-scale data (max ~30 topics)
+  - Laravel service classes are auto-resolved via the IoC container when type-hinted in controller method signatures — no manual binding needed
+  - Topic "claiming" is in-memory only; `is_used` column stays false until a player actually chooses a topic during gameplay (US-008)
+  - `tests/Unit/Services/` is a new directory — works fine; PEST discovers test files recursively
+  - The `shuffle()` on a Collection returns a new shuffled Collection (doesn't modify in place)
+---
