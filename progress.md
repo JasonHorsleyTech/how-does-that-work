@@ -60,3 +60,23 @@
   - Input component passes unknown attrs to the native `<input>` via Vue attribute inheritance — `maxlength`, `@keyup.enter`, etc. work without extra wiring
   - The `canRegister` prop (from Fortify Features) controls whether the Register link appears; always respect it for the Host button
 ---
+
+## 2026-02-24 - US-024
+- Added `credits` column (unsignedInteger, default 0) to users table via new migration
+- Updated `User::$fillable` to include `credits`
+- Created `DevSeeder` with 4 dev accounts (host-loaded/500, host-standard/100, host-broke/2, host-veteran/150), 3 games (lobby/playing/complete), and realistic topic/turn data
+- Updated `DatabaseSeeder` to call `DevSeeder::class` only when `app()->environment('local')`
+- Created `routes/dev.php` with GET /dev, /dev/login-as/{userId}, /dev/join-game/{code}
+- Registered dev routes in `bootstrap/app.php` using `then:` callback, only when env=local
+- Created `DevController` with index, loginAs, joinGame methods; loginAs/joinGame abort 404 in production as belt-and-suspenders
+- Created `resources/views/dev/index.blade.php` (plain Blade, not Inertia) listing accounts, games, and available routes
+- Seeder prints a formatted table summary to console (accounts + games with login/join URLs)
+- **Files changed:** migration, User.php, DevSeeder.php, DatabaseSeeder.php, bootstrap/app.php, routes/dev.php, DevController.php, resources/views/dev/index.blade.php
+- **Learnings for future iterations:**
+  - `bootstrap/app.php` `withRouting()` accepts a `then:` closure for registering additional routes — use `Route::middleware('web')->group(base_path('routes/dev.php'))` inside it
+  - Use `app()->environment('local')` not just `config('app.env') === 'local'` — it handles array matching cleanly
+  - `User::updateOrCreate(['email' => ...], [...])` is idempotent — safe to re-seed without duplicates
+  - Dev Blade views (not Inertia) are appropriate for dev tooling that doesn't need the full SPA
+  - `$this->command` is available on Seeder when called via artisan; use `$this->command->info()` and `$this->command->table()` for formatted console output
+  - The `credits` column is needed by US-024 before US-020 (billing) is implemented — added here as a prerequisite
+---
