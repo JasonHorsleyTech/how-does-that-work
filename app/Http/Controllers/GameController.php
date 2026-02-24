@@ -133,13 +133,36 @@ class GameController extends Controller
             abort(403);
         }
 
-        $totalCount = $game->players()->count();
-        $submittedCount = $game->players()->where('has_submitted', true)->count();
+        $players = $game->players()->get(['id', 'name', 'has_submitted']);
+        $submittedCount = $players->where('has_submitted', true)->count();
+        $totalCount = $players->count();
 
         return response()->json([
             'submittedCount' => $submittedCount,
             'totalCount' => $totalCount,
             'gameStatus' => $game->status,
+            'players' => $players->map(fn ($p) => ['name' => $p->name, 'has_submitted' => (bool) $p->has_submitted]),
         ]);
+    }
+
+    public function startGame(string $code, Request $request)
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        $player = $game->players()->where('user_id', $request->user()->id)->first();
+        if (! $player || ! $player->is_host) {
+            abort(403);
+        }
+
+        if ($game->status !== 'submitting') {
+            return back()->withErrors(['game' => 'Game is not in the submission phase.']);
+        }
+
+        $game->update([
+            'status' => 'playing',
+            'state_updated_at' => now(),
+        ]);
+
+        return redirect("/games/{$game->code}/play");
     }
 }

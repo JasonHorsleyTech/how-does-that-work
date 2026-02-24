@@ -23,8 +23,9 @@ class TopicController extends Controller
             return redirect("/games/{$game->code}/lobby");
         }
 
-        $submittedCount = $game->players()->where('has_submitted', true)->count();
-        $totalCount = $game->players()->count();
+        $allPlayers = $game->players()->get(['id', 'name', 'has_submitted']);
+        $submittedCount = $allPlayers->where('has_submitted', true)->count();
+        $totalCount = $allPlayers->count();
 
         return Inertia::render('games/Submit', [
             'game' => [
@@ -40,6 +41,7 @@ class TopicController extends Controller
             ],
             'submittedCount' => $submittedCount,
             'totalCount' => $totalCount,
+            'players' => $allPlayers->map(fn ($p) => ['name' => $p->name, 'has_submitted' => (bool) $p->has_submitted]),
         ]);
     }
 

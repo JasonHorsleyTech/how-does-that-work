@@ -21,6 +21,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('games/create', [GameController::class, 'create'])->name('games.create');
     Route::post('games', [GameController::class, 'store'])->name('games.store');
     Route::post('games/{code}/start-submission', [GameController::class, 'startSubmission'])->name('games.start-submission');
+    Route::post('games/{code}/start-game', [GameController::class, 'startGame'])->name('games.start-game');
 });
 
 // Lobby accessible to authenticated hosts and guest players (session-based)
