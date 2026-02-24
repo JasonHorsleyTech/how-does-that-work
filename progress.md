@@ -362,3 +362,21 @@
   - Results.vue polling was checking for both `playing` AND `round_complete` to navigate to `/play` — this was wrong; `round_complete` should navigate to `/round-complete`
   - The `finalizeGame()` stub redirects to `/games/{code}/complete` which US-017 will implement; the game status transitions to 'complete' so US-017 can check for it
 ---
+
+## 2026-02-24 - US-017
+- Added `TurnController::complete()` — GET `/games/{code}/complete`: returns `games/Complete` Inertia page with players sorted by score, winner info, and all completed turns per player
+- Added `TurnController::playAgain()` — POST `/games/{code}/play-again`: host-only; creates new `Game` in `lobby` status with same `max_rounds`, adds host as player, redirects to new game's lobby
+- Updated `TurnController::show()` to redirect to `/games/{code}/complete` when game status is `complete`
+- Added two routes: GET `/games/{code}/complete` and POST `/games/{code}/play-again`
+- Created `resources/js/pages/games/Complete.vue`: winner banner (trophy + "{Name} wins with {score} points!"), final scores ranked list (winner highlighted in gold), turn history per player with grade badges, "Play Again" button for host; guest view shows same info with "Thanks for playing!" footer instead
+- Added `DevController::completedGame()` dev helper: logs in as `host-veteran@dev.test` and redirects to `/games/{code}/complete`
+- Added `GET /dev/completed-game` route to `routes/dev.php`
+- 9 PEST feature tests in `GameCompleteTest.php` covering: host/guest access, score sorting, turn count, auth guard, play redirect, play-again creates new game, access control
+- 3 Playwright E2E tests in `game-complete.spec.ts` covering: winner banner, player ranking, turn history
+- **Files changed:** `TurnController.php`, `DevController.php`, `routes/web.php`, `routes/dev.php`, `Complete.vue` (new), `GameCompleteTest.php` (new), `game-complete.spec.ts` (new)
+- **Learnings for future iterations:**
+  - `complete` game status check should come before `round_complete` check in `show()` redirects
+  - `playAgain()` requires `$request->user()` (not just `$isHost`) because guests who are hosts of completed games can't create new auth games — only authenticated hosts can
+  - `turnsForPlayer(playerId)` as a computed function in Vue template is cleaner than pre-grouping on the server side for this display pattern
+  - Dev route `/dev/completed-game` follows the same pattern as `/dev/completed-turn` — log in as known dev user, find their completed game, redirect
+---
