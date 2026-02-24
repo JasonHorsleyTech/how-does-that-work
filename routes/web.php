@@ -41,6 +41,7 @@ Route::get('games/{code}/play-state', [TurnController::class, 'playState'])->nam
 Route::post('games/{code}/turns/{turnId}/start-recording', [TurnController::class, 'startRecording'])->name('games.turns.start-recording');
 Route::post('api/games/{code}/turns/{turnId}/audio', [TurnController::class, 'storeAudio'])->name('games.turns.store-audio');
 Route::get('games/{code}/results/{turnId}', [TurnController::class, 'results'])->name('games.results');
+Route::post('games/{code}/advance', [TurnController::class, 'advance'])->name('games.advance');
 
 Route::get('join/{code}', [JoinController::class, 'show'])->name('games.join.show');
 Route::post('join/{code}', [JoinController::class, 'store'])->name('games.join.store');

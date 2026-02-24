@@ -301,6 +301,38 @@ class TurnController extends Controller
         return response()->json(['status' => 'grading']);
     }
 
+    public function advance(string $code, Request $request)
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        [$player, $isHost] = $this->resolvePlayer($game, $request);
+
+        if (! $player || ! $isHost) {
+            abort(403);
+        }
+
+        $nextTurn = $game->turns()
+            ->where('status', 'pending')
+            ->orderBy('round_number')
+            ->orderBy('turn_order')
+            ->first();
+
+        if ($nextTurn) {
+            $nextTurn->update(['status' => 'choosing']);
+            $game->update([
+                'status' => 'playing',
+                'state_updated_at' => now(),
+            ]);
+        } else {
+            $game->update([
+                'status' => 'round_complete',
+                'state_updated_at' => now(),
+            ]);
+        }
+
+        return redirect("/games/{$game->code}/play");
+    }
+
     private function resolvePlayer(Game $game, Request $request): array
     {
         if ($request->user()) {

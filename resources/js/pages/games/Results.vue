@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -65,6 +65,37 @@ const advanceForm = useForm({});
 function advanceToNext() {
     advanceForm.post(`/games/${props.game.code}/advance`);
 }
+
+let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+async function pollState() {
+    try {
+        const response = await fetch(`/games/${props.game.code}/play-state`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data.gameStatus === 'playing' || data.gameStatus === 'round_complete') {
+            if (pollInterval !== null) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+            window.location.href = `/games/${props.game.code}/play`;
+        }
+    } catch {
+        // ignore transient errors
+    }
+}
+
+onMounted(() => {
+    if (!props.player.is_host) {
+        pollInterval = setInterval(pollState, 3000);
+    }
+});
+
+onUnmounted(() => {
+    if (pollInterval !== null) {
+        clearInterval(pollInterval);
+    }
+});
 </script>
 
 <template>
