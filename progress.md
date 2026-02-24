@@ -99,6 +99,26 @@
   - `assertInertia` in PEST uses a closure: `$response->assertInertia(fn ($page) => $page->component('games/Lobby')->has('game')->has('joinUrl'))`
 ---
 
+## 2026-02-24 - US-004
+- Moved `GET /games/{code}/lobby` out of auth middleware group; lobby is now accessible to both authenticated hosts and session-based guest players
+- Added `GET /games/{code}/players` polling endpoint returning JSON `{ players, nonHostCount }`
+- Updated `GameController::lobby()` to determine `isHost` via player record (auth users) or session (guests), 403 if neither
+- Added `GameController::players()` with same auth check, returns player list for long-polling
+- Rewrote `Lobby.vue` with:
+  - `isHost` prop: hosts see AppLayout with QR code, shareable link, and "Start Submission Phase" button (disabled until 2+ non-host players); guests see a simple page layout with "Waiting for host to start…"
+  - Long polling via `setInterval` every 3s (cleared on unmount)
+  - Live player list with green "online" indicator for both host and guest views
+- Created 9 PEST feature tests in `tests/Feature/LobbyTest.php` covering access control and polling endpoint behavior
+- **Files changed:** `routes/web.php`, `app/Http/Controllers/GameController.php`, `resources/js/pages/games/Lobby.vue`, `tests/Feature/LobbyTest.php`
+- **Learnings for future iterations:**
+  - Guest players need the lobby route outside auth middleware — use in-controller session checks instead
+  - `$request->session()->get("player_id.{$code}")` is the canonical way to identify a guest player in a request
+  - Polling endpoint uses the same dual-auth check pattern: if `$request->user()` → check player record; else → check session
+  - Conditional layout (AppLayout for host, plain div for guest) works well with `v-if` in template; `NavUser` in AppSidebar reads `auth.user` which would crash for unauthenticated guests — keep guests out of AppLayout
+  - `response()->json()` is already casting Eloquent models to arrays; no need to call `->toArray()` manually
+  - Use `getJson()` in PEST (not `get()`) for API/JSON endpoints so the response is parsed as JSON
+---
+
 ## 2026-02-24 - US-003
 - Created `JoinController` with `show()` (GET /join/{code}) and `store()` (POST /join/{code}) actions
 - `show()` renders `games/Join` Inertia page with `game`, `suggestedName` (random two-word animal combo), and `error` prop
