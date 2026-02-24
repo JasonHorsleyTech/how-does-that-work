@@ -98,3 +98,22 @@
   - The lobby page needs `game` and `joinUrl` props passed from the controller via `Inertia::render()`
   - `assertInertia` in PEST uses a closure: `$response->assertInertia(fn ($page) => $page->component('games/Lobby')->has('game')->has('joinUrl'))`
 ---
+
+## 2026-02-24 - US-003
+- Created `JoinController` with `show()` (GET /join/{code}) and `store()` (POST /join/{code}) actions
+- `show()` renders `games/Join` Inertia page with `game`, `suggestedName` (random two-word animal combo), and `error` prop
+- `store()` validates name, creates guest `Player` (user_id=null, is_host=false), stores `player_id` in session as `"player_id.{code}"`, redirects to lobby
+- Error handling: returns `error` prop from show() for pre-load errors (game started, full); returns session errors from store() for post-submit errors
+- Game code matching is case-insensitive (strtoupper'd before lookup)
+- Max 10 players enforced on both show and store
+- Created `resources/js/pages/games/Join.vue` using `AuthLayout` (appropriate for unauthenticated guests), `useForm` for submission
+- Added two public routes to `routes/web.php` (no auth middleware): `GET /join/{code}`, `POST /join/{code}`
+- 12 PEST feature tests in `tests/Feature/JoinTest.php`
+- **Files changed:** `app/Http/Controllers/JoinController.php`, `routes/web.php`, `resources/js/pages/games/Join.vue`, `tests/Feature/JoinTest.php`
+- **Learnings for future iterations:**
+  - `$this->assertSessionHas()` is NOT available in PEST test closures — use `$response->assertSessionHas()` instead
+  - Session key for player identity: `"player_id.{$game->code}"` — keyed by game code so one browser can track multiple games
+  - Pint `single_quote` rule flags unnecessary double-quoted strings; run `./vendor/bin/pint` to auto-fix before testing
+  - For guest-facing pages (no auth), use `AuthLayout` — it's a clean centered card layout without requiring login
+  - Passing errors as Inertia props (for pre-load validation) is cleaner than session flash for read-only error states
+---
