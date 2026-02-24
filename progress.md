@@ -119,6 +119,23 @@
   - Use `getJson()` in PEST (not `get()`) for API/JSON endpoints so the response is parsed as JSON
 ---
 
+## 2026-02-24 - US-005
+- Added `GameController::startSubmission()` — POST `/games/{code}/start-submission` (auth + host only); validates ≥2 non-host players, transitions game to `submitting`, redirects to submit page
+- Updated `GameController::players()` to include `gameStatus` in JSON response so Lobby.vue can detect status change
+- Added `GameController::submissionStatus()` — GET `/games/{code}/submission-status` (dual-auth); returns `submittedCount`, `totalCount`, `gameStatus` for polling
+- Created `TopicController` with `show()` (GET `/games/{code}/submit`, dual-auth, redirects to lobby if not in submitting status) and `store()` (POST `/games/{code}/topics`, dual-auth, validates 3 topics at 5–120 chars, creates Topic records, sets `has_submitted = true`)
+- Updated `Lobby.vue`: wired "Start Submission Phase" button to `useForm.post()`, added `gameStatus` check in pollPlayers to redirect to submit page when `submitting`
+- Created `Submit.vue`: dual-view (AppLayout for host, plain div for guests), topic submission form (3 inputs, validation), waiting state with `submittedCount/totalCount` polling after submission
+- Added 14 PEST feature tests covering: start submission, submit page access, topic creation, duplicate prevention, validation, status polling
+- **Files changed:** `GameController.php`, `TopicController.php` (new), `routes/web.php`, `Lobby.vue`, `Submit.vue` (new), `TopicSubmissionTest.php` (new)
+- **Learnings for future iterations:**
+  - `resolvePlayer()` private method on TopicController encapsulates dual-auth (user vs session) cleanly — reuse this pattern for all game-phase controllers
+  - Pint flags: `unary_operator_spaces` (spaces around `!`), `no_unused_imports`, `not_operator_with_successor_space` — run `./vendor/bin/pint` immediately after writing PHP
+  - `useForm({})` from `@inertiajs/vue3` with `.post()` is the idiomatic way to trigger a form submission that also handles CSRF; even for empty-payload actions like "start submission"
+  - `form.errors[\`topics.${n - 1}\`]` accesses dot-notated nested validation errors in Vue — Laravel uses `topics.0`, `topics.1` etc. for array field errors
+  - Polling in Submit.vue only starts after submission (inside `if (player.has_submitted)` in `onMounted`) to avoid unnecessary requests
+---
+
 ## 2026-02-24 - US-003
 - Created `JoinController` with `show()` (GET /join/{code}) and `store()` (POST /join/{code}) actions
 - `show()` renders `games/Join` Inertia page with `game`, `suggestedName` (random two-word animal combo), and `error` prop
