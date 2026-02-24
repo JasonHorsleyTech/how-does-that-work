@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\GameController;
+use App\Http\Controllers\JoinController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -20,5 +21,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('games', [GameController::class, 'store'])->name('games.store');
     Route::get('games/{code}/lobby', [GameController::class, 'lobby'])->name('games.lobby');
 });
+
+Route::get('join/{code}', [JoinController::class, 'show'])->name('games.join.show');
+Route::post('join/{code}', [JoinController::class, 'store'])->name('games.join.store');
 
 require __DIR__.'/settings.php';
