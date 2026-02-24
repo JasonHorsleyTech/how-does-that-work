@@ -380,3 +380,20 @@
   - `turnsForPlayer(playerId)` as a computed function in Vue template is cleaner than pre-grouping on the server side for this display pattern
   - Dev route `/dev/completed-game` follows the same pattern as `/dev/completed-turn` — log in as known dev user, find their completed game, redirect
 ---
+
+## 2026-02-24 - US-018
+- Added `TurnController::gameState()` — GET `/api/games/{code}/state`: consolidated state endpoint returning `game.status`, `game.current_round`, `current_turn` (id, player_name, topic, status, time_remaining), `players` (id, name, score, has_submitted), and `last_updated` ISO timestamp
+- Added `TurnController::buildGameState()` private helper: builds the state array from a Game model, finds the active choosing/recording turn, computes time_remaining from started_at, maps players
+- Caching: 1-second `Cache::remember` keyed by `game_state_{code}_{state_updated_at_timestamp}` — same state = cache hit; any state change = new key = fresh response
+- Added route `GET /api/games/{code}/state` to `routes/web.php`
+- Created `resources/js/composables/useGameState.ts`: factory function `useGameState(code, onStateChange?)` returning `{ state, start, stop }` — polls `/api/games/{code}/state` every 3 seconds, compares `last_updated`, calls `onStateChange` on change, ignores network errors
+- Created `resources/js/composables/useGameState.test.ts`: 8 Vitest tests covering immediate call, 3s interval, state-change detection, no-change suppression, stop(), state ref update, error/non-ok handling
+- 13 PEST feature tests in `GameStateTest.php` covering: auth/session access control, correct JSON shape for all game statuses (lobby/submitting/playing/grading_complete/round_complete/complete), choosing/recording turn in current_turn, time_remaining calculation, last_updated value
+- **Files changed:** `TurnController.php`, `routes/web.php`, `useGameState.ts` (new), `useGameState.test.ts` (new), `GameStateTest.php` (new)
+- **Learnings for future iterations:**
+  - Cache key with `state_updated_at` timestamp avoids stale test data: `game_state_{code}_{timestamp}` — cache is effectively invalidated when game state changes without needing `Cache::flush()` in tests
+  - `await Promise.resolve()` only flushes ONE microtask tick — for async chains with multiple `await` (e.g., `await fetch()` then `await json()`), use a `flushPromises()` helper that calls `await Promise.resolve()` 3 times
+  - `vi.stubGlobal('fetch', mockFn)` + `vi.restoreAllMocks()` in afterEach is the clean pattern for mocking global `fetch` in Vitest
+  - The composable uses no Vue lifecycle hooks (no `onMounted`/`onUnmounted`) so it can be tested without Vue context — consumer calls `start()`/`stop()` in their lifecycle hooks
+  - `Cache::flush()` in `beforeEach` in PEST tests ensures the 1-second cache doesn't interfere between test cases that share game codes (rare but safe)
+---
