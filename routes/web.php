@@ -39,6 +39,7 @@ Route::get('games/{code}/play', [TurnController::class, 'show'])->name('games.pl
 Route::post('games/{code}/turns/{turnId}/choose-topic', [TurnController::class, 'chooseTopic'])->name('games.turns.choose-topic');
 Route::get('games/{code}/play-state', [TurnController::class, 'playState'])->name('games.play-state');
 Route::post('games/{code}/turns/{turnId}/start-recording', [TurnController::class, 'startRecording'])->name('games.turns.start-recording');
+Route::get('api/games/{code}/state', [TurnController::class, 'gameState'])->name('games.state');
 Route::post('api/games/{code}/turns/{turnId}/audio', [TurnController::class, 'storeAudio'])->name('games.turns.store-audio');
 Route::get('games/{code}/results/{turnId}', [TurnController::class, 'results'])->name('games.results');
 Route::post('games/{code}/advance', [TurnController::class, 'advance'])->name('games.advance');

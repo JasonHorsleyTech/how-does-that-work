@@ -7,6 +7,7 @@ use App\Models\Game;
 use App\Models\Topic;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 
 class TurnController extends Controller
@@ -181,6 +182,82 @@ class TurnController extends Controller
                 'is_host' => $p->is_host,
             ]),
         ]);
+    }
+
+    public function gameState(string $code, Request $request): JsonResponse
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        [$player] = $this->resolvePlayer($game, $request);
+
+        if (! $player) {
+            abort(403);
+        }
+
+        $stateUpdatedAt = $game->state_updated_at?->timestamp ?? 0;
+        $cacheKey = "game_state_{$game->code}_{$stateUpdatedAt}";
+
+        $data = Cache::remember($cacheKey, 1, function () use ($game) {
+            return $this->buildGameState($game);
+        });
+
+        return response()->json($data);
+    }
+
+    private function buildGameState(Game $game): array
+    {
+        $currentTurn = null;
+
+        $activeTurn = $game->turns()
+            ->whereIn('status', ['choosing', 'recording'])
+            ->with('player')
+            ->orderBy('round_number')
+            ->orderBy('turn_order')
+            ->first();
+
+        if ($activeTurn) {
+            $topicText = null;
+            $timeRemaining = null;
+
+            if ($activeTurn->topic_id) {
+                $topicText = Topic::where('id', $activeTurn->topic_id)->value('text');
+            }
+
+            if ($activeTurn->started_at) {
+                $elapsed = max(0, now()->timestamp - $activeTurn->started_at->timestamp);
+                $timeRemaining = max(0, 120 - $elapsed);
+            }
+
+            $currentTurn = [
+                'id' => $activeTurn->id,
+                'player_name' => $activeTurn->player->name,
+                'topic' => $topicText,
+                'status' => $activeTurn->status,
+                'time_remaining' => $timeRemaining,
+            ];
+        }
+
+        $players = $game->players()
+            ->orderBy('id')
+            ->get(['id', 'name', 'score', 'has_submitted'])
+            ->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'score' => $p->score,
+                'has_submitted' => (bool) $p->has_submitted,
+            ])
+            ->values()
+            ->toArray();
+
+        return [
+            'game' => [
+                'status' => $game->status,
+                'current_round' => $game->current_round,
+            ],
+            'current_turn' => $currentTurn,
+            'players' => $players,
+            'last_updated' => $game->state_updated_at?->toISOString(),
+        ];
     }
 
     public function playState(string $code, Request $request): JsonResponse
