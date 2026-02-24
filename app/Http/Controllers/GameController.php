@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Game;
 use App\Models\Player;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -40,15 +41,53 @@ class GameController extends Controller
         return redirect("/games/{$game->code}/lobby");
     }
 
-    public function lobby(string $code)
+    public function lobby(string $code, Request $request)
     {
-        $game = Game::with(['players'])->where('code', $code)->firstOrFail();
+        $game = Game::with(['players'])->where('code', strtoupper($code))->firstOrFail();
 
-        $joinUrl = url("/join/{$code}");
+        $isHost = false;
+
+        if ($request->user()) {
+            $player = $game->players()->where('user_id', $request->user()->id)->first();
+            if (! $player) {
+                abort(403);
+            }
+            $isHost = (bool) $player->is_host;
+        } else {
+            $playerId = $request->session()->get("player_id.{$game->code}");
+            if (! $playerId || ! $game->players()->where('id', $playerId)->exists()) {
+                abort(403);
+            }
+        }
 
         return Inertia::render('games/Lobby', [
             'game' => $game,
-            'joinUrl' => $joinUrl,
+            'joinUrl' => url("/join/{$game->code}"),
+            'isHost' => $isHost,
+        ]);
+    }
+
+    public function players(string $code, Request $request): JsonResponse
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        if ($request->user()) {
+            $hasAccess = $game->players()->where('user_id', $request->user()->id)->exists();
+        } else {
+            $playerId = $request->session()->get("player_id.{$game->code}");
+            $hasAccess = $playerId && $game->players()->where('id', $playerId)->exists();
+        }
+
+        if (! $hasAccess) {
+            abort(403);
+        }
+
+        $players = $game->players()->get(['id', 'name', 'is_host']);
+        $nonHostCount = $players->where('is_host', false)->count();
+
+        return response()->json([
+            'players' => $players,
+            'nonHostCount' => $nonHostCount,
         ]);
     }
 }
