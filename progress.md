@@ -1,6 +1,8 @@
 ## Codebase Patterns
 - Laravel 12 + Vue/Inertia starter kit with Laravel Fortify for auth
-- SQLite database in development (DB_CONNECTION=sqlite in .env)
+- MySQL database in development (DB_CONNECTION=mysql, DB_DATABASE=how_does_that_work, root with no password)
+- Tests use SQLite in-memory (phpunit.xml: DB_CONNECTION=sqlite, DB_DATABASE=:memory:)
+- **MySQL FK naming bug**: Never chain `->index()` after `->constrained()` — overrides FK constraint name with boolean `true` → MySQL renders as `1` → "Duplicate foreign key constraint name '1'" error. MySQL auto-creates FK indexes.
 - Pest PHP 4.4 for testing; Feature tests auto-get TestCase+RefreshDatabase via Pest.php config
 - Unit tests needing DB must use `uses(Tests\TestCase::class, RefreshDatabase::class)` explicitly
 - Migrations use date-based timestamps: `2026_02_24_000001_create_xxx_table.php`
@@ -25,4 +27,20 @@
   - The project had pre-existing lint issues (missing EOF newlines, operator spacing) that pint auto-fixed
   - PlayerFactory defaults `user_id` to null (guests), TopicFactory generates fake sentence text
   - TurnFactory sets topic_id to null by default since topic assignment happens in gameplay
+---
+
+## 2026-02-24 - US-022
+- Switched default DB connection from sqlite to mysql in `config/database.php`
+- Updated `.env.example` to uncomment and set MySQL variables (DB_HOST, DB_PORT=3306, DB_DATABASE, DB_USERNAME, DB_PASSWORD)
+- Updated `.env` to use local MySQL (how_does_that_work database, root, no password)
+- `phpunit.xml` already used SQLite in-memory for tests — no change needed
+- Fixed critical MySQL compatibility bug in all 4 custom migrations: removed `->index()` chained after `->constrained()`. This Fluent `__call` magic overrides the FK constraint `index` attribute (the constraint name string) with boolean `true`, which MySQL stringifies to `1`, causing "Duplicate foreign key constraint name '1'" on the second FK. MySQL auto-creates indexes on FK columns, so `->index()` was redundant.
+- All migrations verified with `php artisan migrate:fresh` against MySQL 9.5.0
+- All 57 PEST tests still pass (tests use SQLite in-memory, unaffected)
+- **Files changed:** `config/database.php`, `.env.example`, `.env`, 4 migration files
+- **Learnings for future iterations:**
+  - MySQL 9.x requires globally unique FK constraint names per database
+  - Chaining `->index()` on a `ForeignKeyDefinition` returned by `constrained()` is a Laravel footgun — it silently corrupts the constraint name via Fluent `__call` magic
+  - MySQL auto-indexes FK columns, so explicit `->index()` after FK definition is unnecessary
+  - `phpunit.xml` already properly isolates tests to SQLite in-memory — tests don't need MySQL
 ---
