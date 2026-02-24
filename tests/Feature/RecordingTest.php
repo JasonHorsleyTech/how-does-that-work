@@ -7,6 +7,7 @@ use App\Models\Turn;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
@@ -97,6 +98,7 @@ test('start-recording returns 422 when turn is not in recording state', function
 });
 
 test('active player can upload audio — transitions turn to grading', function () {
+    Queue::fake();
     Storage::fake('local');
 
     ['game' => $game, 'activePlayer' => $activePlayer, 'turn' => $turn] = setupAudioUploadTurn();

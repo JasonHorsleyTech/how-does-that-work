@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\TranscribeAudio;
 use App\Models\Game;
 use App\Models\Topic;
 use Illuminate\Http\JsonResponse;
@@ -234,6 +235,8 @@ class TurnController extends Controller
         ]);
 
         $game->update(['state_updated_at' => now()]);
+
+        dispatch(new TranscribeAudio($turn));
 
         return response()->json(['status' => 'grading']);
     }
