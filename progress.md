@@ -8,6 +8,8 @@
 - Migrations use date-based timestamps: `2026_02_24_000001_create_xxx_table.php`
 - Run `./vendor/bin/pint` to auto-fix lint before commits; `./vendor/bin/pint --test` to check
 - `composer test` runs lint + tests; both must pass before committing
+- Vitest (v4) configured via `vitest.config.ts`; test script is `npm run test:js`; test files live alongside source at `resources/js/**/*.test.ts`
+- Audio level detection: `calculateAudioLevel(Uint8Array)` returns RMS 0–1; `isSpeechDetected(level, threshold=0.01)` returns boolean; both in `resources/js/utils/audioLevel.ts`
 - Model factories go in `database/factories/`; use `Model::factory()` pattern
 
 ---
@@ -226,4 +228,27 @@
   - In-place UI update (via reactive local state) is better UX than redirecting for non-active players detecting a state change — avoids full page reload
   - When adding new props to `currentTurn` in `show()`, always add `->etc()` to existing tests or update them to include the new field
   - `Topic::where('id', $id)->value('text')` is the efficient way to fetch a single column without loading the full model
+---
+## 2026-02-24 - US-010
+- Set up Vitest (v4) for JavaScript unit testing: `vitest.config.ts` at project root, `test:js` script in package.json
+- Created `resources/js/utils/audioLevel.ts` with two pure utility functions:
+  - `calculateAudioLevel(dataArray: Uint8Array): number` — RMS of Web Audio API time-domain data (0=silence, ~1=max)
+  - `isSpeechDetected(level: number, threshold = 0.01): boolean` — true when level exceeds threshold
+- Created `resources/js/utils/audioLevel.test.ts` with 9 Vitest tests covering silence, max signal, half amplitude, and threshold detection
+- Updated `Play.vue` mic test UI for active player in `recording` state:
+  - `testing` phase: pulsing red dot + "Say 'testing, testing, one, two, three'..." instruction
+  - Listens via `getUserMedia` + `AudioContext` + `AnalyserNode`, checks level every 100ms
+  - Once speech detected for 1 cumulative second: shows "Mic confirmed!" + "Start My Turn" button
+  - `error` state (mic permission denied): shows "Continue Without Mic Check" fallback button
+  - "Start My Turn" stops mic stream; US-011 will wire up actual recording
+- Updated non-active players and host views to show "{Name} is checking their microphone…" in `recording` state
+- Added `watch()` on `props.currentTurn?.status` to handle Inertia SPA in-page transition from `choosing` → `recording` without full remount
+- **Files changed:** `resources/js/utils/audioLevel.ts`, `resources/js/utils/audioLevel.test.ts`, `vitest.config.ts`, `package.json`, `resources/js/pages/games/Play.vue`
+- **Learnings for future iterations:**
+  - Vitest 4 works with `vitest.config.ts` using `defineConfig` from `vitest/config`; no need to modify `vite.config.ts`
+  - For mic level detection, use `AudioContext` + `AnalyserNode.getByteTimeDomainData()` (NOT `MediaRecorder`); MediaRecorder is for capture/upload (US-011)
+  - `Uint8Array` values 0–255 from `getByteTimeDomainData`: 128 = silence; normalize with `(value - 128) / 128` before RMS calculation
+  - Inertia SPA navigations to same component update props reactively but do NOT remount; use `watch(props.xxx)` to detect and act on prop changes mid-session
+  - `getUserMedia` requires user gesture or HTTPS; `micState === 'error'` fallback is important UX for permission-denied scenarios
+  - For active player: `onMounted` handles the "page loaded with recording status" case; `watch` handles the "choosing → recording in-page transition" case
 ---
