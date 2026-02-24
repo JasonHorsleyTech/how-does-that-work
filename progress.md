@@ -194,3 +194,19 @@
   - `tests/Unit/Services/` is a new directory — works fine; PEST discovers test files recursively
   - The `shuffle()` on a Collection returns a new shuffled Collection (doesn't modify in place)
 ---
+
+## 2026-02-24 - US-008
+- Modified `GameController::startGame()` to set the first turn (round 1, turn_order 1) to `choosing` status after `assignTurns()` runs
+- Created `TurnController` with:
+  - `show()` — GET `/games/{code}/play`: resolves current `choosing`/`recording` turn, returns Play.vue with `isActivePlayer` bool, topic choices (id + text)
+  - `chooseTopic()` — POST `/games/{code}/turns/{turnId}/choose-topic`: validates topic is in turn's choices, sets `is_used = true` on chosen topic, transitions turn to `recording`
+  - `playState()` — GET `/games/{code}/play-state`: JSON polling endpoint returning current turn status for non-active players
+- Created `Play.vue`: host gets AppLayout; guest gets simple layout; active player sees two topic choice cards; non-active players see "X is choosing..." with 3s polling that redirects on state change
+- Added 8 PEST feature tests in `tests/Feature/TopicChoiceTest.php`
+- **Files changed:** `GameController.php`, `TurnController.php` (new), `routes/web.php`, `Play.vue` (new), `TopicChoiceTest.php` (new)
+- **Learnings for future iterations:**
+  - `has('prop', fn ($t) => ...)` in `assertInertia` is strict — use `->etc()` inside the closure if you don't assert every property of that object
+  - `resolvePlayer()` dual-auth pattern (user vs session) is now in three controllers (TopicController, TurnController + future ones) — consider extracting to a trait or base controller if it grows further
+  - When `startGame()` creates turns via `assignTurns()`, the first turn must be explicitly set to `choosing` — `assignTurns()` only creates `pending` turns by design
+  - The `is_used` column on topics is only set to `true` when a player actively chooses a topic; unclaimed topic_choices remain `false` until chosen
+---
