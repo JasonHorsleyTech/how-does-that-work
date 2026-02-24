@@ -437,3 +437,17 @@
   - Credit deduction in jobs: use `if ($host && $host->credits > 0) { $host->decrement('credits'); }` — guard prevents going below zero
   - Cashier v16 migrations: `cashier:install` command doesn't exist; use `php artisan vendor:publish --tag="cashier-migrations"` to publish them
 ---
+
+## 2026-02-24 - US-021
+- Implemented API usage tracking per game
+- Created `api_usage_logs` migration with `game_id`, `user_id`, `type` (whisper|gpt), `tokens_used` (nullable), `cost_credits`, `timestamps`
+- Created `ApiUsageLog` model with `game()` and `user()` relationships
+- Updated `TranscribeAudio` job: checks host credits BEFORE calling Whisper; if 0 credits, marks turn `grading_failed` with "Host ran out of credits." message; on success deducts 1 credit and creates a `whisper` ApiUsageLog record
+- Updated `GradeTurn` job: checks host credits BEFORE calling GPT; if 0 credits, marks turn `grading_failed` and advances game to `grading_complete`; on success deducts 1 credit and creates a `gpt` ApiUsageLog record
+- Files changed: `database/migrations/2026_02_24_000009_create_api_usage_logs_table.php`, `app/Models/ApiUsageLog.php`, `app/Jobs/TranscribeAudio.php`, `app/Jobs/GradeTurn.php`, `tests/Feature/ApiUsageTest.php`
+- **Learnings for future iterations:**
+  - When jobs need to skip API calls based on resource availability, check BEFORE the API call (not after)
+  - `$response->usage?->totalTokens` safely accesses token count from OpenAI chat responses (null if no usage data)
+  - pint `no_unused_imports` will remove model imports if the model class is only referenced via string table names (e.g. `assertDatabaseHas('api_usage_logs', ...)` doesn't require `use App\Models\ApiUsageLog`)
+  - All existing billing tests still pass because the zero-credits guard only skips the API call — credits stay at 0, which is what those tests assert
+---
