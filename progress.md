@@ -80,3 +80,21 @@
   - `$this->command` is available on Seeder when called via artisan; use `$this->command->info()` and `$this->command->table()` for formatted console output
   - The `credits` column is needed by US-024 before US-020 (billing) is implemented — added here as a prerequisite
 ---
+
+## 2026-02-24 - US-002
+- Added `Game::generateUniqueCode()` static method (loops until unique 6-char uppercase string found)
+- Created `GameController` with `create()`, `store()`, and `lobby()` actions
+- Added game routes to `routes/web.php` under `auth+verified` middleware: GET /games/create, POST /games, GET /games/{code}/lobby
+- Created `resources/js/pages/games/Create.vue` — form with max_rounds radio (1 or 2), submits via Inertia `useForm`
+- Created `resources/js/pages/games/Lobby.vue` — shows game code, QR code (generated via `qrcode` npm package in `onMounted`), shareable link, and player list
+- Installed `qrcode` npm package (+ `@types/qrcode`) for client-side QR code generation
+- 9 PEST feature tests in `tests/Feature/GameTest.php`
+- **Files changed:** app/Models/Game.php, app/Http/Controllers/GameController.php, routes/web.php, resources/js/pages/games/Create.vue, resources/js/pages/games/Lobby.vue, tests/Feature/GameTest.php, package.json, package-lock.json
+- **Learnings for future iterations:**
+  - `resources/js/actions`, `resources/js/routes`, and `resources/js/wayfinder` are gitignored — they're Wayfinder auto-generated files, never commit them
+  - For parameterized routes like `/games/{code}/lobby`, Wayfinder generates helpers with `(args: { code: string }, options?)` signature
+  - `useForm` from `@inertiajs/vue3` is the idiomatic way to submit forms with Inertia — provides `form.post('/path')`, `form.errors`, `form.processing`
+  - `QRCode.toDataURL(url, opts)` from the `qrcode` package returns a Promise<string> — call it in `onMounted` and bind the result to a `ref<string>`
+  - The lobby page needs `game` and `joinUrl` props passed from the controller via `Inertia::render()`
+  - `assertInertia` in PEST uses a closure: `$response->assertInertia(fn ($page) => $page->component('games/Lobby')->has('game')->has('joinUrl'))`
+---
