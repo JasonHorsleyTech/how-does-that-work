@@ -38,6 +38,8 @@ Route::get('games/{code}/submission-status', [GameController::class, 'submission
 Route::get('games/{code}/play', [TurnController::class, 'show'])->name('games.play');
 Route::post('games/{code}/turns/{turnId}/choose-topic', [TurnController::class, 'chooseTopic'])->name('games.turns.choose-topic');
 Route::get('games/{code}/play-state', [TurnController::class, 'playState'])->name('games.play-state');
+Route::post('games/{code}/turns/{turnId}/start-recording', [TurnController::class, 'startRecording'])->name('games.turns.start-recording');
+Route::post('api/games/{code}/turns/{turnId}/audio', [TurnController::class, 'storeAudio'])->name('games.turns.store-audio');
 
 Route::get('join/{code}', [JoinController::class, 'show'])->name('games.join.show');
 Route::post('join/{code}', [JoinController::class, 'store'])->name('games.join.store');

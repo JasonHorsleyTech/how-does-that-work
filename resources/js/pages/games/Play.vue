@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { calculateAudioLevel, isSpeechDetected } from '@/utils/audioLevel';
+import { createCountdownTimer, type CountdownTimer } from '@/utils/countdownTimer';
 import { dashboard } from '@/routes';
 
 const props = defineProps<{
@@ -52,7 +53,24 @@ const countdownSeconds = ref(3);
 
 // Mic test state for the active player
 const micState = ref<'idle' | 'testing' | 'confirmed' | 'error'>('idle');
-const micTurnStarted = ref(false);
+
+// Recording state for the active player (after mic check)
+const recordingPhase = ref<'idle' | 'recording' | 'uploading' | 'done' | 'error'>('idle');
+const timeLeft = ref(120);
+const timeLeftDisplay = computed(() => {
+    const m = Math.floor(timeLeft.value / 60);
+    const s = String(timeLeft.value % 60).padStart(2, '0');
+    return `${m}:${s}`;
+});
+
+// Non-active player: tracking when active player is explaining
+const localRecordingStarted = ref(false);
+const nonActiveTimeLeft = ref(120);
+const nonActiveTimeDisplay = computed(() => {
+    const m = Math.floor(nonActiveTimeLeft.value / 60);
+    const s = String(nonActiveTimeLeft.value % 60).padStart(2, '0');
+    return `${m}:${s}`;
+});
 
 let countdownTimer: ReturnType<typeof setInterval> | null = null;
 let pollInterval: ReturnType<typeof setInterval> | null = null;
@@ -60,6 +78,16 @@ let micStream: MediaStream | null = null;
 let micAudioContext: AudioContext | null = null;
 let micAnalyser: AnalyserNode | null = null;
 let micCheckInterval: ReturnType<typeof setInterval> | null = null;
+let activeRecordingTimer: CountdownTimer | null = null;
+let nonActiveRecordingTimer: CountdownTimer | null = null;
+let mediaRecorder: MediaRecorder | null = null;
+let recordingStream: MediaStream | null = null;
+let audioChunks: Blob[] = [];
+
+function getCsrfToken(): string {
+    const match = document.cookie.split('; ').find((row) => row.startsWith('XSRF-TOKEN='));
+    return match ? decodeURIComponent(match.split('=').slice(1).join('=')) : '';
+}
 
 function startGetReadyCountdown(playerName: string, topicText: string) {
     revealPlayerName.value = playerName;
@@ -134,10 +162,97 @@ function stopMicStream() {
     }
 }
 
-function startMyTurn() {
+async function startMyTurn() {
     stopMicStream();
-    micTurnStarted.value = true;
-    // US-011 will implement the actual recording flow
+
+    // Notify server that recording has started (sets started_at for time tracking)
+    await fetch(`/games/${props.game.code}/turns/${props.currentTurn!.id}/start-recording`, {
+        method: 'POST',
+        headers: {
+            'X-XSRF-TOKEN': getCsrfToken(),
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    });
+
+    // Attempt to start MediaRecorder
+    try {
+        recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        audioChunks = [];
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+        mediaRecorder = new MediaRecorder(recordingStream, mimeType ? { mimeType } : undefined);
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) audioChunks.push(e.data);
+        };
+        mediaRecorder.start();
+    } catch {
+        // Mic unavailable — proceed without recording, audio will be empty
+        audioChunks = [];
+    }
+
+    recordingPhase.value = 'recording';
+    timeLeft.value = 120;
+
+    activeRecordingTimer = createCountdownTimer(
+        120,
+        (s) => {
+            timeLeft.value = s;
+        },
+        () => {
+            void stopAndUploadRecording();
+        },
+    );
+    activeRecordingTimer.start();
+}
+
+async function stopAndUploadRecording() {
+    if (activeRecordingTimer) {
+        activeRecordingTimer.stop();
+        activeRecordingTimer = null;
+    }
+
+    // Stop MediaRecorder and collect final data
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        await new Promise<void>((resolve) => {
+            mediaRecorder!.onstop = () => resolve();
+            mediaRecorder!.stop();
+        });
+    }
+
+    if (recordingStream) {
+        recordingStream.getTracks().forEach((t) => t.stop());
+        recordingStream = null;
+    }
+
+    recordingPhase.value = 'uploading';
+
+    await uploadAudio();
+}
+
+async function uploadAudio() {
+    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+    const formData = new FormData();
+    formData.append('audio', blob, `${props.currentTurn!.id}.webm`);
+
+    try {
+        const response = await fetch(`/api/games/${props.game.code}/turns/${props.currentTurn!.id}/audio`, {
+            method: 'POST',
+            headers: {
+                'X-XSRF-TOKEN': getCsrfToken(),
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: formData,
+        });
+
+        if (response.ok) {
+            recordingPhase.value = 'done';
+        } else {
+            recordingPhase.value = 'error';
+        }
+    } catch {
+        recordingPhase.value = 'error';
+    }
 }
 
 onMounted(() => {
@@ -159,7 +274,11 @@ onMounted(() => {
 onUnmounted(() => {
     if (pollInterval) clearInterval(pollInterval);
     if (countdownTimer) clearInterval(countdownTimer);
+    if (nonActiveRecordingTimer) nonActiveRecordingTimer.stop();
     stopMicStream();
+    if (activeRecordingTimer) activeRecordingTimer.stop();
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    if (recordingStream) recordingStream.getTracks().forEach((t) => t.stop());
 });
 
 // Handle in-page transition from choosing → recording (Inertia SPA update)
@@ -190,6 +309,29 @@ async function pollState() {
                 );
             } else if (data.turnStatus !== localTurnStatus.value) {
                 localTurnStatus.value = data.turnStatus;
+            }
+
+            // Detect when active player starts recording
+            if (data.turnStatus === 'recording' && data.recordingStarted && !localRecordingStarted.value) {
+                localRecordingStarted.value = true;
+                revealPlayerName.value = data.chosenTopicPlayerName ?? revealPlayerName.value;
+
+                // Start local countdown synced from server
+                const serverTime = typeof data.timeRemaining === 'number' ? data.timeRemaining : 120;
+                nonActiveTimeLeft.value = serverTime;
+
+                if (nonActiveRecordingTimer) nonActiveRecordingTimer.stop();
+                nonActiveRecordingTimer = createCountdownTimer(
+                    serverTime,
+                    (s) => {
+                        nonActiveTimeLeft.value = s;
+                    },
+                    () => {},
+                );
+                nonActiveRecordingTimer.start();
+            } else if (data.turnStatus === 'recording' && data.recordingStarted && typeof data.timeRemaining === 'number') {
+                // Resync from server on each poll
+                nonActiveTimeLeft.value = data.timeRemaining;
             }
         }
     } catch {
@@ -230,6 +372,13 @@ async function pollState() {
                         {{ currentTurn.player_name }} is choosing their topic…
                     </p>
                     <p class="mt-2 text-muted-foreground">Waiting for them to pick.</p>
+                </div>
+
+                <!-- Active player is explaining (host view) -->
+                <div v-else-if="localTurnStatus === 'recording' && localRecordingStarted" class="rounded-xl border p-8 text-center">
+                    <p class="text-lg font-semibold">{{ revealPlayerName }} is explaining…</p>
+                    <p class="mt-2 text-3xl font-bold tabular-nums text-primary">{{ nonActiveTimeDisplay }}</p>
+                    <p class="mt-1 text-sm text-muted-foreground">remaining</p>
                 </div>
 
                 <!-- Active player is checking their microphone -->
@@ -283,6 +432,63 @@ async function pollState() {
                 </div>
             </div>
 
+            <!-- Active player: recording phase (after mic check) -->
+            <div v-else-if="localTurnStatus === 'recording' && isActivePlayer && recordingPhase === 'recording'" class="space-y-6 rounded-xl border p-8">
+                <!-- Topic reminder -->
+                <div class="text-center">
+                    <p class="text-sm font-medium uppercase tracking-wide text-muted-foreground">Explaining:</p>
+                    <p class="mt-1 text-xl font-bold text-primary">{{ currentTurn.chosen_topic_text }}</p>
+                </div>
+
+                <!-- Timer -->
+                <div class="text-center">
+                    <p class="text-6xl font-bold tabular-nums" :class="timeLeft <= 30 ? 'text-destructive' : 'text-foreground'">
+                        {{ timeLeftDisplay }}
+                    </p>
+                    <p class="mt-1 text-sm text-muted-foreground">remaining</p>
+                </div>
+
+                <!-- Recording indicator -->
+                <div class="flex items-center justify-center gap-2 text-sm font-medium text-red-600">
+                    <span class="inline-block h-3 w-3 animate-pulse rounded-full bg-red-500"></span>
+                    Recording…
+                </div>
+
+                <!-- Done button -->
+                <button
+                    type="button"
+                    class="w-full rounded-xl border-2 border-border px-6 py-3 font-semibold transition-colors hover:border-primary hover:bg-primary/5"
+                    @click="stopAndUploadRecording"
+                >
+                    I'm Done
+                </button>
+            </div>
+
+            <!-- Active player: uploading -->
+            <div v-else-if="localTurnStatus === 'recording' && isActivePlayer && recordingPhase === 'uploading'" class="rounded-xl border p-8 text-center">
+                <p class="text-lg font-semibold">Uploading your explanation…</p>
+                <p class="mt-2 text-muted-foreground">Hang tight!</p>
+            </div>
+
+            <!-- Active player: done / grading -->
+            <div v-else-if="localTurnStatus === 'recording' && isActivePlayer && recordingPhase === 'done'" class="rounded-xl border p-8 text-center">
+                <p class="text-lg font-semibold">Great job!</p>
+                <p class="mt-2 text-muted-foreground">Your explanation is being graded…</p>
+            </div>
+
+            <!-- Active player: upload error -->
+            <div v-else-if="localTurnStatus === 'recording' && isActivePlayer && recordingPhase === 'error'" class="rounded-xl border p-8 text-center">
+                <p class="text-lg font-semibold text-destructive">Upload failed</p>
+                <p class="mt-2 text-muted-foreground">Something went wrong. Please try again.</p>
+                <button
+                    type="button"
+                    class="mt-4 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground hover:opacity-90"
+                    @click="uploadAudio"
+                >
+                    Retry Upload
+                </button>
+            </div>
+
             <!-- Active player mic test -->
             <div v-else-if="localTurnStatus === 'recording' && isActivePlayer" class="space-y-4 rounded-xl border p-8">
                 <div class="text-center">
@@ -290,14 +496,8 @@ async function pollState() {
                     <p class="mt-1 text-xl font-bold text-primary">{{ currentTurn.chosen_topic_text }}</p>
                 </div>
 
-                <!-- Recording started (US-011 will implement actual recording) -->
-                <div v-if="micTurnStarted" class="rounded-xl bg-muted p-6 text-center">
-                    <p class="text-lg font-semibold">Recording starting…</p>
-                    <p class="mt-1 text-muted-foreground">Get ready to explain!</p>
-                </div>
-
                 <!-- Mic confirmed -->
-                <div v-else-if="micState === 'confirmed'" class="space-y-4 text-center">
+                <div v-if="micState === 'confirmed'" class="space-y-4 text-center">
                     <p class="font-semibold text-green-600">Mic confirmed! Start explaining when ready.</p>
                     <button
                         type="button"
@@ -337,6 +537,13 @@ async function pollState() {
                 </p>
                 <p class="text-2xl font-bold text-primary">{{ revealTopicText }}</p>
                 <p class="text-lg text-muted-foreground">Get Ready… {{ countdownSeconds }}</p>
+            </div>
+
+            <!-- Another player is explaining (non-active observers) -->
+            <div v-else-if="localTurnStatus === 'recording' && localRecordingStarted" class="rounded-xl border p-8 text-center">
+                <p class="text-lg font-semibold">{{ revealPlayerName }} is explaining…</p>
+                <p class="mt-2 text-3xl font-bold tabular-nums text-primary">{{ nonActiveTimeDisplay }}</p>
+                <p class="mt-1 text-sm text-muted-foreground">remaining</p>
             </div>
 
             <!-- Another player is choosing -->

@@ -143,11 +143,19 @@ class TurnController extends Controller
 
         $chosenTopicText = null;
         $chosenTopicPlayerName = null;
+        $timeRemaining = null;
+        $recordingStarted = false;
 
         if ($currentTurn && $currentTurn->status === 'recording' && $currentTurn->topic_id) {
             $topic = Topic::find($currentTurn->topic_id);
             $chosenTopicText = $topic?->text;
             $chosenTopicPlayerName = $currentTurn->player?->name;
+
+            if ($currentTurn->started_at) {
+                $recordingStarted = true;
+                $elapsed = max(0, now()->timestamp - $currentTurn->started_at->timestamp);
+                $timeRemaining = max(0, 120 - $elapsed);
+            }
         }
 
         return response()->json([
@@ -158,7 +166,76 @@ class TurnController extends Controller
             'stateUpdatedAt' => $game->state_updated_at?->toISOString(),
             'chosenTopicText' => $chosenTopicText,
             'chosenTopicPlayerName' => $chosenTopicPlayerName,
+            'recordingStarted' => $recordingStarted,
+            'timeRemaining' => $timeRemaining,
         ]);
+    }
+
+    public function startRecording(string $code, int $turnId, Request $request): JsonResponse
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        [$player] = $this->resolvePlayer($game, $request);
+
+        if (! $player) {
+            abort(403);
+        }
+
+        $turn = $game->turns()->where('id', $turnId)->firstOrFail();
+
+        if ($turn->player_id !== $player->id) {
+            abort(403);
+        }
+
+        if ($turn->status !== 'recording') {
+            return response()->json(['error' => 'Turn is not in recording state.'], 422);
+        }
+
+        $turn->update(['started_at' => now()]);
+        $game->update(['state_updated_at' => now()]);
+
+        return response()->json(['started_at' => $turn->fresh()->started_at->toISOString()]);
+    }
+
+    public function storeAudio(string $code, int $turnId, Request $request): JsonResponse
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        [$player] = $this->resolvePlayer($game, $request);
+
+        if (! $player) {
+            abort(403);
+        }
+
+        $turn = $game->turns()->where('id', $turnId)->firstOrFail();
+
+        if ($turn->player_id !== $player->id) {
+            abort(403);
+        }
+
+        if ($turn->status !== 'recording') {
+            return response()->json(['error' => 'Turn is not in recording state.'], 422);
+        }
+
+        $request->validate([
+            'audio' => ['required', 'file'],
+        ]);
+
+        $path = $request->file('audio')->storeAs(
+            "audio/{$game->code}",
+            "{$turnId}.webm",
+            'local'
+        );
+
+        $turn->update([
+            'audio_path' => $path,
+            'status' => 'grading',
+            'completed_at' => now(),
+        ]);
+
+        $game->update(['state_updated_at' => now()]);
+
+        return response()->json(['status' => 'grading']);
     }
 
     private function resolvePlayer(Game $game, Request $request): array
