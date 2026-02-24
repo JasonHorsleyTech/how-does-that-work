@@ -210,3 +210,20 @@
   - When `startGame()` creates turns via `assignTurns()`, the first turn must be explicitly set to `choosing` — `assignTurns()` only creates `pending` turns by design
   - The `is_used` column on topics is only set to `true` when a player actively chooses a topic; unclaimed topic_choices remain `false` until chosen
 ---
+
+## 2026-02-24 - US-009
+- Updated `TurnController::playState()` to eagerly load the `player` relationship and include `chosenTopicText` and `chosenTopicPlayerName` in the JSON response when a turn is in `recording` status
+- Updated `TurnController::show()` to include `chosen_topic_text` in the `currentTurn` Inertia prop (from a DB lookup when `topic_id` is set)
+- Rewrote `Play.vue` with reactive local state (`localTurnStatus`, `revealPlayerName`, `revealTopicText`) and a 3-second countdown mechanism (`showCountdown`, `countdownSeconds`)
+- Non-active players: when polling detects transition from `choosing` → `recording`, in-place countdown shows "{Player Name} has chosen to explain: {Topic Text} - Get Ready… N"
+- Active player: when landing on `/games/{code}/play` with `recording` status, shows a mic test placeholder ("Mic check coming up…") for US-010 to implement fully
+- Both host and guest views show the countdown panel when `showCountdown` is true
+- Added 4 PEST feature tests in `tests/Feature/TopicRevealTest.php` covering: polling includes topic text on recording, polling returns null on choosing, Inertia page includes `chosen_topic_text`
+- Fixed `TopicChoiceTest.php` assertion (added `->etc()`) to avoid strict property check failing on new `chosen_topic_text` field
+- **Files changed:** `TurnController.php`, `Play.vue`, `TopicRevealTest.php` (new), `TopicChoiceTest.php` (fix)
+- **Learnings for future iterations:**
+  - `playState()` needed `->with('player')` added to the query to load the player relationship for `chosenTopicPlayerName` — without it, `$currentTurn->player` is null
+  - In-place UI update (via reactive local state) is better UX than redirecting for non-active players detecting a state change — avoids full page reload
+  - When adding new props to `currentTurn` in `show()`, always add `->etc()` to existing tests or update them to include the new field
+  - `Topic::where('id', $id)->value('text')` is the efficient way to fetch a single column without loading the full model
+---
