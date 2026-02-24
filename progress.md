@@ -397,3 +397,19 @@
   - The composable uses no Vue lifecycle hooks (no `onMounted`/`onUnmounted`) so it can be tested without Vue context — consumer calls `start()`/`stop()` in their lifecycle hooks
   - `Cache::flush()` in `beforeEach` in PEST tests ensures the 1-second cache doesn't interfere between test cases that share game codes (rare but safe)
 ---
+
+## 2026-02-24 - US-019
+- Fortify registration (`/register`) and redirect to `/dashboard` were already configured (`'home' => '/dashboard'` in `config/fortify.php`) — no changes needed for registration itself
+- Created `DashboardController::index()`: queries auth user's games with players eagerly loaded, maps to summary array (code, status, created_at, player_count, winner)
+- Updated dashboard route in `routes/web.php` to use `DashboardController::index` instead of a closure
+- Rewrote `Dashboard.vue`: replaced placeholder patterns with a real games table (date, code, players, winner, status badge); empty state with "Host a Game" CTA; status badge color-coded (complete=green, in-progress=blue, lobby=gray)
+- Added 5 PEST feature tests in `DashboardTest.php`: guests redirect, authenticated can view, shows host's games, filters by host, shows winner, orders newest first
+- Added 6 PEST feature tests in `RegistrationTest.php`: form renders, registers and redirects to dashboard, creates user record, validates name/email/password
+- **Files changed:** `app/Http/Controllers/DashboardController.php` (new), `routes/web.php`, `resources/js/pages/Dashboard.vue`, `tests/Feature/DashboardTest.php`, `tests/Feature/RegistrationTest.php` (new)
+- **Learnings for future iterations:**
+  - Fortify `'home' => '/dashboard'` in `config/fortify.php` controls the post-auth redirect — no extra controller work needed for registration redirect
+  - `$user->games()->with('players')->orderByDesc('created_at')->get()` is the clean pattern for fetching hosted games with eager-loaded players
+  - `$game->players->sortByDesc('score')->first()` on an already-loaded Collection avoids N+1 queries for winner determination
+  - The existing `tests/Feature/Auth/RegistrationTest.php` (from Fortify starter kit) only tests basic registration — our new `RegistrationTest.php` adds dashboard-redirect and validation tests
+  - Pint flags `no_unused_imports` in test files too — don't import `use App\Models\User` unless you actually reference it by name
+---
