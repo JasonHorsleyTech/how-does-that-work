@@ -1,4 +1,5 @@
 ## Codebase Patterns
+- `now()->timestamp - $carbon->timestamp` is the reliable way to compute elapsed seconds in Laravel (avoid `diffInSeconds` which can return unexpected values in test environments)
 - Laravel 12 + Vue/Inertia starter kit with Laravel Fortify for auth
 - MySQL database in development (DB_CONNECTION=mysql, DB_DATABASE=how_does_that_work, root with no password)
 - Tests use SQLite in-memory (phpunit.xml: DB_CONNECTION=sqlite, DB_DATABASE=:memory:)
@@ -251,4 +252,24 @@
   - Inertia SPA navigations to same component update props reactively but do NOT remount; use `watch(props.xxx)` to detect and act on prop changes mid-session
   - `getUserMedia` requires user gesture or HTTPS; `micState === 'error'` fallback is important UX for permission-denied scenarios
   - For active player: `onMounted` handles the "page loaded with recording status" case; `watch` handles the "choosing → recording in-page transition" case
+---
+
+## 2026-02-24 - US-011
+- Created `resources/js/utils/countdownTimer.ts`: `createCountdownTimer(duration, onTick, onDone)` — pure timer factory returning `{ start, stop }`, ticks every 1s, calls `onDone` at 0, idempotent start
+- Created `resources/js/utils/countdownTimer.test.ts`: 8 Vitest tests with `vi.useFakeTimers()` covering tick, done, stop, no double-done, idempotent start
+- Added `TurnController::startRecording()` — POST `/games/{code}/turns/{turnId}/start-recording`; sets `started_at = now()`, validates turn is in `recording` status, returns `started_at` ISO string
+- Added `TurnController::storeAudio()` — POST `/api/games/{code}/turns/{turnId}/audio`; validates `audio` file, stores to `storage/app/audio/{code}/{turnId}.webm`, transitions turn to `grading`, sets `completed_at`
+- Updated `TurnController::playState()` to return `recordingStarted` (bool) and `timeRemaining` (int|null) based on `started_at`
+- Added two new routes to `routes/web.php`
+- Rewrote active player recording UI in `Play.vue`: full `MediaRecorder` capture flow, 2-minute countdown (turns red at ≤30s), "I'm Done" button, uploading state, grading state, retry on error
+- Non-active players see "{Name} is explaining… (M:SS)" with local countdown synced from polling `timeRemaining`; host view also updated with explaining panel
+- Added 9 PEST feature tests in `RecordingTest.php` covering: startRecording (success, 403, 422), storeAudio (success, 403, 422, missing file), playState fields
+- **Files changed:** `TurnController.php`, `routes/web.php`, `Play.vue`, `countdownTimer.ts`, `countdownTimer.test.ts`, `RecordingTest.php`
+- **Learnings for future iterations:**
+  - `Carbon::diffInSeconds()` can return unexpected values in SQLite test environment — use `now()->timestamp - $carbon->timestamp` for reliable elapsed-time math
+  - `MediaRecorder` `ondataavailable` fires when `.stop()` is called; use a Promise wrapping `onstop` to await final chunk collection before blob creation
+  - PEST global helper functions must have unique names across all test files (all are loaded into the same namespace); name collisions cause "Cannot redeclare function" fatal error
+  - For POST endpoints that return JSON (not Inertia redirects), use `postJson()` in PEST tests; `post()` follows redirects and doesn't parse JSON
+  - `Storage::fake('local')` + `UploadedFile::fake()->create(name, kb, mime)` is the clean pattern for testing file uploads in PEST
+  - Audio file upload uses `storeAs()` directly on the `UploadedFile` object — no need to import `Illuminate\Support\Facades\Storage` in the controller
 ---
