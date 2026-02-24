@@ -273,3 +273,21 @@
   - `Storage::fake('local')` + `UploadedFile::fake()->create(name, kb, mime)` is the clean pattern for testing file uploads in PEST
   - Audio file upload uses `storeAs()` directly on the `UploadedFile` object — no need to import `Illuminate\Support\Facades\Storage` in the controller
 ---
+
+## 2026-02-24 - US-012
+- Installed `openai-php/laravel` package and published `config/openai.php`
+- Fixed `OPEN_AI_API_KEY` → `OPENAI_API_KEY` in `.env` and `.env.example` (config expects `OPENAI_API_KEY`)
+- Added `grading_failed` to `turns.status` enum via new migration `2026_02_24_000007_add_grading_failed_to_turns_status.php`
+- Created `app/Jobs/TranscribeAudio.php`: reads audio from storage, calls `OpenAI::audio()->transcribe()` with `whisper-1`, stores transcript, dispatches `GradeTurn` on success, sets `grading_failed` on error/empty
+- Created stub `app/Jobs/GradeTurn.php` (empty `handle()` — implemented in US-013)
+- Updated `TurnController::storeAudio()` to `dispatch(new TranscribeAudio($turn))` after storing audio
+- Added `Queue::fake()` to `RecordingTest` audio-upload test to prevent synchronous job execution in tests
+- Created 5 PEST tests in `TranscribeAudioTest.php`: upload dispatches job, transcript stored + GradeTurn dispatched, empty transcript → grading_failed, exception → grading_failed, missing file → grading_failed
+- **Files changed:** `composer.json`, `composer.lock`, `config/openai.php`, `app/Jobs/TranscribeAudio.php`, `app/Jobs/GradeTurn.php`, `app/Http/Controllers/TurnController.php`, `database/migrations/2026_02_24_000007_add_grading_failed_to_turns_status.php`, `tests/Feature/TranscribeAudioTest.php`, `tests/Feature/RecordingTest.php`, `.env.example`
+- **Learnings for future iterations:**
+  - `QUEUE_CONNECTION=sync` in `phpunit.xml` means dispatched jobs run immediately in tests — always add `Queue::fake()` when testing HTTP endpoints that dispatch jobs, or the job will execute and mutate state
+  - `OpenAI::fake([TranscriptionResponse::fake(['text' => '...'])])` is the clean test pattern; `TranscriptionResponse` uses `Fakeable` trait with a fixture; override just the `text` key
+  - `openai-php/laravel` facade is `OpenAI\Laravel\Facades\OpenAI` (not `OpenAI\Facades\OpenAI`) — use the Laravel-specific namespace
+  - SQLite supports `ALTER TABLE ... CHANGE` via doctrine/dbal — the `grading_failed` enum migration works in both MySQL (production) and SQLite (tests)
+  - `Storage::disk('local')->readStream($path)` is the way to get a file stream for OpenAI's audio transcribe API; it expects a resource/stream, not a file path string
+---
