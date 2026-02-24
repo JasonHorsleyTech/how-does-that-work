@@ -329,3 +329,16 @@
   - Results page uses `window.location.href` (full page load) rather than Inertia `router.visit()` to avoid issues with the polling interval + component lifecycle
   - `computed` for grade badge CSS class is the clean way to handle conditional styling for 5 grade values
 ---
+
+## 2026-02-24 - US-015
+- Added `TurnController::advance()` — POST `/games/{code}/advance` (host only): finds next `pending` turn, sets it to `choosing`, game back to `playing`; if no pending turns, transitions game to `round_complete`; always redirects to `/games/{code}/play`
+- Added route `POST /games/{code}/advance` to `routes/web.php`
+- Updated `Results.vue`: non-host players now poll `/games/{code}/play-state` every 3 seconds; when `gameStatus` is `playing` or `round_complete`, navigate via `window.location.href` to `/games/{code}/play`
+- Added 6 PEST feature tests in `AdvanceTurnTest.php`: host advances to next turn, round_complete when no pending turns, non-host 403, guest session 403, unauthenticated 403, only lowest turn_order is set to choosing
+- **Files changed:** `TurnController.php`, `routes/web.php`, `resources/js/pages/games/Results.vue`, `tests/Feature/AdvanceTurnTest.php`
+- **Learnings for future iterations:**
+  - `advance()` uses `resolvePlayer()` and checks the second return value (`$isHost`) for host-only enforcement — guests always return `false` for isHost so no extra check needed
+  - After `round_complete`, `TurnController::show()` redirects to lobby (since game status is not `playing`) — US-016 will need to add a round complete screen/route before changing this redirect logic
+  - Non-host polling on Results.vue is gated by `!props.player.is_host` — hosts navigate via Inertia form post redirect, not polling
+  - `state_updated_at` should always be updated in any state-transition endpoint so that polling clients can detect the change
+---
