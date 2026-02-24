@@ -88,6 +88,58 @@ class GameController extends Controller
         return response()->json([
             'players' => $players,
             'nonHostCount' => $nonHostCount,
+            'gameStatus' => $game->status,
+        ]);
+    }
+
+    public function startSubmission(string $code, Request $request)
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        $player = $game->players()->where('user_id', $request->user()->id)->first();
+        if (! $player || ! $player->is_host) {
+            abort(403);
+        }
+
+        if ($game->status !== 'lobby') {
+            return back()->withErrors(['game' => 'Game is not in lobby status.']);
+        }
+
+        $nonHostCount = $game->players()->where('is_host', false)->count();
+        if ($nonHostCount < 2) {
+            return back()->withErrors(['game' => 'At least 2 non-host players must join before starting.']);
+        }
+
+        $game->update([
+            'status' => 'submitting',
+            'state_updated_at' => now(),
+        ]);
+
+        return redirect("/games/{$game->code}/submit");
+    }
+
+    public function submissionStatus(string $code, Request $request): JsonResponse
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        if ($request->user()) {
+            $hasAccess = $game->players()->where('user_id', $request->user()->id)->exists();
+        } else {
+            $playerId = $request->session()->get("player_id.{$game->code}");
+            $hasAccess = $playerId && $game->players()->where('id', $playerId)->exists();
+        }
+
+        if (! $hasAccess) {
+            abort(403);
+        }
+
+        $totalCount = $game->players()->count();
+        $submittedCount = $game->players()->where('has_submitted', true)->count();
+
+        return response()->json([
+            'submittedCount' => $submittedCount,
+            'totalCount' => $totalCount,
+            'gameStatus' => $game->status,
         ]);
     }
 }

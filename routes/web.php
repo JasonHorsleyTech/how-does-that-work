@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\GameController;
 use App\Http\Controllers\JoinController;
+use App\Http\Controllers\TopicController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -19,11 +20,17 @@ Route::get('dashboard', function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('games/create', [GameController::class, 'create'])->name('games.create');
     Route::post('games', [GameController::class, 'store'])->name('games.store');
+    Route::post('games/{code}/start-submission', [GameController::class, 'startSubmission'])->name('games.start-submission');
 });
 
 // Lobby accessible to authenticated hosts and guest players (session-based)
 Route::get('games/{code}/lobby', [GameController::class, 'lobby'])->name('games.lobby');
 Route::get('games/{code}/players', [GameController::class, 'players'])->name('games.players');
+
+// Submit phase: accessible to hosts and guest players (session-based)
+Route::get('games/{code}/submit', [TopicController::class, 'show'])->name('games.submit');
+Route::post('games/{code}/topics', [TopicController::class, 'store'])->name('games.topics.store');
+Route::get('games/{code}/submission-status', [GameController::class, 'submissionStatus'])->name('games.submission-status');
 
 Route::get('join/{code}', [JoinController::class, 'show'])->name('games.join.show');
 Route::post('join/{code}', [JoinController::class, 'store'])->name('games.join.store');

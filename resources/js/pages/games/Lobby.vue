@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,12 @@ const players = ref([...props.game.players]);
 const nonHostCount = computed(() => players.value.filter((p) => !p.is_host).length);
 const canStart = computed(() => nonHostCount.value >= 2);
 
+const startForm = useForm({});
+
+function startSubmission() {
+    startForm.post(`/games/${props.game.code}/start-submission`);
+}
+
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 
 onMounted(async () => {
@@ -56,6 +62,11 @@ async function pollPlayers() {
         if (response.ok) {
             const data = await response.json();
             players.value = data.players;
+
+            if (data.gameStatus === 'submitting') {
+                clearInterval(pollInterval!);
+                router.visit(`/games/${props.game.code}/submit`);
+            }
         }
     } catch {
         // Ignore polling errors silently
@@ -128,8 +139,12 @@ async function pollPlayers() {
 
                 <!-- Start button -->
                 <div class="pt-2">
-                    <Button class="w-full" :disabled="!canStart">
-                        Start Submission Phase
+                    <Button
+                        class="w-full"
+                        :disabled="!canStart || startForm.processing"
+                        @click="startSubmission"
+                    >
+                        {{ startForm.processing ? 'Starting…' : 'Start Submission Phase' }}
                     </Button>
                     <p v-if="!canStart" class="mt-2 text-center text-sm text-muted-foreground">
                         Waiting for at least 2 players to join…
