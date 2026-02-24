@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { Head, useForm, router } from '@inertiajs/vue3';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { Head, useForm } from '@inertiajs/vue3';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
+
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Button } from '@/components/ui/button';
 import { type BreadcrumbItem } from '@/types';
+import { calculateAudioLevel, isSpeechDetected } from '@/utils/audioLevel';
 import { dashboard } from '@/routes';
 
 const props = defineProps<{
@@ -49,8 +50,16 @@ const revealTopicText = ref(props.currentTurn?.chosen_topic_text ?? '');
 const showCountdown = ref(false);
 const countdownSeconds = ref(3);
 
+// Mic test state for the active player
+const micState = ref<'idle' | 'testing' | 'confirmed' | 'error'>('idle');
+const micTurnStarted = ref(false);
+
 let countdownTimer: ReturnType<typeof setInterval> | null = null;
 let pollInterval: ReturnType<typeof setInterval> | null = null;
+let micStream: MediaStream | null = null;
+let micAudioContext: AudioContext | null = null;
+let micAnalyser: AnalyserNode | null = null;
+let micCheckInterval: ReturnType<typeof setInterval> | null = null;
 
 function startGetReadyCountdown(playerName: string, topicText: string) {
     revealPlayerName.value = playerName;
@@ -68,10 +77,74 @@ function startGetReadyCountdown(playerName: string, topicText: string) {
     }, 1000);
 }
 
+async function initMicTest() {
+    if (micState.value !== 'idle') return;
+
+    micState.value = 'testing';
+
+    try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        micAudioContext = new AudioContext();
+        micAnalyser = micAudioContext.createAnalyser();
+        micAnalyser.fftSize = 256;
+
+        const source = micAudioContext.createMediaStreamSource(micStream);
+        source.connect(micAnalyser);
+
+        const dataArray = new Uint8Array(micAnalyser.frequencyBinCount);
+        let consecutiveSpeechMs = 0;
+
+        micCheckInterval = setInterval(() => {
+            if (!micAnalyser) return;
+            micAnalyser.getByteTimeDomainData(dataArray);
+            const level = calculateAudioLevel(dataArray);
+
+            if (isSpeechDetected(level)) {
+                consecutiveSpeechMs += 100;
+                if (consecutiveSpeechMs >= 1000) {
+                    micState.value = 'confirmed';
+                    clearInterval(micCheckInterval!);
+                    micCheckInterval = null;
+                }
+            } else {
+                consecutiveSpeechMs = 0;
+            }
+        }, 100);
+    } catch {
+        micState.value = 'error';
+    }
+}
+
+function stopMicStream() {
+    if (micCheckInterval) {
+        clearInterval(micCheckInterval);
+        micCheckInterval = null;
+    }
+    if (micAnalyser) {
+        micAnalyser.disconnect();
+        micAnalyser = null;
+    }
+    if (micAudioContext) {
+        micAudioContext.close();
+        micAudioContext = null;
+    }
+    if (micStream) {
+        micStream.getTracks().forEach((track) => track.stop());
+        micStream = null;
+    }
+}
+
+function startMyTurn() {
+    stopMicStream();
+    micTurnStarted.value = true;
+    // US-011 will implement the actual recording flow
+}
+
 onMounted(() => {
     if (props.isActivePlayer) {
-        // Active player: if they land here with recording status they already chose
-        // Mic test (US-010) will handle actual recording prompt
+        if (localTurnStatus.value === 'recording') {
+            initMicTest();
+        }
         return;
     }
 
@@ -86,7 +159,19 @@ onMounted(() => {
 onUnmounted(() => {
     if (pollInterval) clearInterval(pollInterval);
     if (countdownTimer) clearInterval(countdownTimer);
+    stopMicStream();
 });
+
+// Handle in-page transition from choosing → recording (Inertia SPA update)
+watch(
+    () => props.currentTurn?.status,
+    (newStatus) => {
+        if (newStatus === 'recording' && props.isActivePlayer && micState.value === 'idle') {
+            localTurnStatus.value = 'recording';
+            initMicTest();
+        }
+    },
+);
 
 async function pollState() {
     try {
@@ -131,12 +216,12 @@ async function pollState() {
                 </div>
 
                 <!-- Topic reveal countdown (host observing) -->
-                <div v-else-if="showCountdown" class="rounded-xl border p-8 text-center space-y-4">
+                <div v-else-if="showCountdown" class="space-y-4 rounded-xl border p-8 text-center">
                     <p class="text-lg font-semibold">
                         {{ revealPlayerName }} has chosen to explain:
                     </p>
                     <p class="text-2xl font-bold text-primary">{{ revealTopicText }}</p>
-                    <p class="text-muted-foreground text-lg">Get Ready… {{ countdownSeconds }}</p>
+                    <p class="text-lg text-muted-foreground">Get Ready… {{ countdownSeconds }}</p>
                 </div>
 
                 <!-- Active player is choosing -->
@@ -147,11 +232,10 @@ async function pollState() {
                     <p class="mt-2 text-muted-foreground">Waiting for them to pick.</p>
                 </div>
 
-                <!-- Active player has chosen, now recording -->
+                <!-- Active player is checking their microphone -->
                 <div v-else-if="localTurnStatus === 'recording'" class="rounded-xl border p-8 text-center">
-                    <p class="text-lg font-semibold">
-                        {{ revealPlayerName }} is explaining their topic…
-                    </p>
+                    <p class="text-lg font-semibold">{{ revealPlayerName }} is checking their microphone…</p>
+                    <p class="mt-2 text-muted-foreground">Almost time!</p>
                 </div>
             </div>
         </div>
@@ -199,19 +283,60 @@ async function pollState() {
                 </div>
             </div>
 
-            <!-- Active player chose — mic test placeholder (US-010 will implement fully) -->
-            <div v-else-if="localTurnStatus === 'recording' && isActivePlayer && !showCountdown" class="rounded-xl border p-8 text-center space-y-4">
-                <p class="text-lg font-semibold">You chose: {{ currentTurn.chosen_topic_text }}</p>
-                <p class="text-muted-foreground">Mic check coming up…</p>
+            <!-- Active player mic test -->
+            <div v-else-if="localTurnStatus === 'recording' && isActivePlayer" class="space-y-4 rounded-xl border p-8">
+                <div class="text-center">
+                    <p class="text-lg font-semibold">You chose:</p>
+                    <p class="mt-1 text-xl font-bold text-primary">{{ currentTurn.chosen_topic_text }}</p>
+                </div>
+
+                <!-- Recording started (US-011 will implement actual recording) -->
+                <div v-if="micTurnStarted" class="rounded-xl bg-muted p-6 text-center">
+                    <p class="text-lg font-semibold">Recording starting…</p>
+                    <p class="mt-1 text-muted-foreground">Get ready to explain!</p>
+                </div>
+
+                <!-- Mic confirmed -->
+                <div v-else-if="micState === 'confirmed'" class="space-y-4 text-center">
+                    <p class="font-semibold text-green-600">Mic confirmed! Start explaining when ready.</p>
+                    <button
+                        type="button"
+                        class="w-full rounded-xl bg-primary px-6 py-4 text-lg font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                        @click="startMyTurn"
+                    >
+                        Start My Turn
+                    </button>
+                </div>
+
+                <!-- Mic error — allow proceeding anyway -->
+                <div v-else-if="micState === 'error'" class="space-y-4 text-center">
+                    <p class="text-amber-600">Microphone not available. You can still continue.</p>
+                    <button
+                        type="button"
+                        class="w-full rounded-xl bg-primary px-6 py-4 text-lg font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                        @click="startMyTurn"
+                    >
+                        Continue Without Mic Check
+                    </button>
+                </div>
+
+                <!-- Mic testing in progress -->
+                <div v-else class="space-y-3 text-center">
+                    <p class="text-base font-medium">Say <em>"testing, testing, one, two, three"</em> to confirm your mic is working</p>
+                    <div class="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-red-500"></span>
+                        Listening for your voice…
+                    </div>
+                </div>
             </div>
 
             <!-- Topic reveal countdown (non-active observing) -->
-            <div v-else-if="showCountdown" class="rounded-xl border p-8 text-center space-y-4">
+            <div v-else-if="showCountdown" class="space-y-4 rounded-xl border p-8 text-center">
                 <p class="text-lg font-semibold">
                     {{ revealPlayerName }} has chosen to explain:
                 </p>
                 <p class="text-2xl font-bold text-primary">{{ revealTopicText }}</p>
-                <p class="text-muted-foreground text-lg">Get Ready… {{ countdownSeconds }}</p>
+                <p class="text-lg text-muted-foreground">Get Ready… {{ countdownSeconds }}</p>
             </div>
 
             <!-- Another player is choosing -->
@@ -222,11 +347,10 @@ async function pollState() {
                 <p class="mt-2 text-muted-foreground">Hang tight!</p>
             </div>
 
-            <!-- Active player is recording -->
+            <!-- Active player is checking their microphone (non-active observers) -->
             <div v-else-if="localTurnStatus === 'recording'" class="rounded-xl border p-8 text-center">
-                <p class="text-lg font-semibold">
-                    {{ revealPlayerName }} is explaining their topic…
-                </p>
+                <p class="text-lg font-semibold">{{ revealPlayerName }} is checking their microphone…</p>
+                <p class="mt-2 text-muted-foreground">Almost time!</p>
             </div>
         </div>
     </div>
