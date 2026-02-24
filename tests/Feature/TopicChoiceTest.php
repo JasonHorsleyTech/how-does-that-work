@@ -74,6 +74,7 @@ test('play page loads for authenticated host with choosing turn', function () {
                 ->where('status', 'choosing')
                 ->where('player_name', $activePlayer->name)
                 ->has('topic_choices', 2)
+                ->etc()
             )
             ->where('isActivePlayer', false)
         );

@@ -56,6 +56,11 @@ class TurnController extends Controller
                 ->toArray();
         }
 
+        $chosenTopicText = null;
+        if ($currentTurn->topic_id) {
+            $chosenTopicText = Topic::where('id', $currentTurn->topic_id)->value('text');
+        }
+
         return Inertia::render('games/Play', [
             'game' => [
                 'id' => $game->id,
@@ -73,6 +78,7 @@ class TurnController extends Controller
                 'status' => $currentTurn->status,
                 'player_name' => $currentTurn->player->name,
                 'topic_choices' => $topicChoices,
+                'chosen_topic_text' => $chosenTopicText,
             ],
             'isActivePlayer' => $player->id === $currentTurn->player_id,
         ]);
@@ -130,9 +136,19 @@ class TurnController extends Controller
 
         $currentTurn = $game->turns()
             ->whereIn('status', ['choosing', 'recording'])
+            ->with('player')
             ->orderBy('round_number')
             ->orderBy('turn_order')
             ->first();
+
+        $chosenTopicText = null;
+        $chosenTopicPlayerName = null;
+
+        if ($currentTurn && $currentTurn->status === 'recording' && $currentTurn->topic_id) {
+            $topic = Topic::find($currentTurn->topic_id);
+            $chosenTopicText = $topic?->text;
+            $chosenTopicPlayerName = $currentTurn->player?->name;
+        }
 
         return response()->json([
             'gameStatus' => $game->status,
@@ -140,6 +156,8 @@ class TurnController extends Controller
             'turnId' => $currentTurn?->id,
             'turnPlayerId' => $currentTurn?->player_id,
             'stateUpdatedAt' => $game->state_updated_at?->toISOString(),
+            'chosenTopicText' => $chosenTopicText,
+            'chosenTopicPlayerName' => $chosenTopicPlayerName,
         ]);
     }
 

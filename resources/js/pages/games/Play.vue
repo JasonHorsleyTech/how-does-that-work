@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm, router } from '@inertiajs/vue3';
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
 import { type BreadcrumbItem } from '@/types';
@@ -23,6 +23,7 @@ const props = defineProps<{
         status: string;
         player_name: string;
         topic_choices: { id: number; text: string }[];
+        chosen_topic_text: string | null;
     } | null;
     isActivePlayer: boolean;
 }>();
@@ -39,16 +40,52 @@ function chooseTopic(topicId: number) {
     choiceForm.post(`/games/${props.game.code}/turns/${props.currentTurn!.id}/choose-topic`);
 }
 
+// Local reactive state driven by polling (for non-active players) or page load
+const localTurnStatus = ref(props.currentTurn?.status ?? null);
+const revealPlayerName = ref(props.currentTurn?.player_name ?? '');
+const revealTopicText = ref(props.currentTurn?.chosen_topic_text ?? '');
+
+// Countdown state: shown when a topic has just been chosen
+const showCountdown = ref(false);
+const countdownSeconds = ref(3);
+
+let countdownTimer: ReturnType<typeof setInterval> | null = null;
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 
+function startGetReadyCountdown(playerName: string, topicText: string) {
+    revealPlayerName.value = playerName;
+    revealTopicText.value = topicText;
+    showCountdown.value = true;
+    countdownSeconds.value = 3;
+
+    countdownTimer = setInterval(() => {
+        countdownSeconds.value--;
+        if (countdownSeconds.value <= 0) {
+            clearInterval(countdownTimer!);
+            countdownTimer = null;
+            showCountdown.value = false;
+        }
+    }, 1000);
+}
+
 onMounted(() => {
-    if (!props.isActivePlayer) {
-        pollInterval = setInterval(pollState, 3000);
+    if (props.isActivePlayer) {
+        // Active player: if they land here with recording status they already chose
+        // Mic test (US-010) will handle actual recording prompt
+        return;
     }
+
+    // Non-active player: if page already shows recording state, start countdown
+    if (localTurnStatus.value === 'recording' && revealTopicText.value) {
+        startGetReadyCountdown(revealPlayerName.value, revealTopicText.value);
+    }
+
+    pollInterval = setInterval(pollState, 3000);
 });
 
 onUnmounted(() => {
     if (pollInterval) clearInterval(pollInterval);
+    if (countdownTimer) clearInterval(countdownTimer);
 });
 
 async function pollState() {
@@ -58,9 +95,16 @@ async function pollState() {
         });
         if (response.ok) {
             const data = await response.json();
-            if (data.turnStatus && data.turnStatus !== 'choosing') {
-                clearInterval(pollInterval!);
-                router.visit(`/games/${props.game.code}/play`);
+
+            if (data.turnStatus === 'recording' && localTurnStatus.value === 'choosing') {
+                // Topic was just chosen — show reveal + countdown in place
+                localTurnStatus.value = 'recording';
+                startGetReadyCountdown(
+                    data.chosenTopicPlayerName ?? revealPlayerName.value,
+                    data.chosenTopicText ?? '',
+                );
+            } else if (data.turnStatus !== localTurnStatus.value) {
+                localTurnStatus.value = data.turnStatus;
             }
         }
     } catch {
@@ -86,8 +130,17 @@ async function pollState() {
                     <p class="text-lg font-semibold">Waiting for turns to begin…</p>
                 </div>
 
+                <!-- Topic reveal countdown (host observing) -->
+                <div v-else-if="showCountdown" class="rounded-xl border p-8 text-center space-y-4">
+                    <p class="text-lg font-semibold">
+                        {{ revealPlayerName }} has chosen to explain:
+                    </p>
+                    <p class="text-2xl font-bold text-primary">{{ revealTopicText }}</p>
+                    <p class="text-muted-foreground text-lg">Get Ready… {{ countdownSeconds }}</p>
+                </div>
+
                 <!-- Active player is choosing -->
-                <div v-else-if="currentTurn.status === 'choosing'" class="rounded-xl border p-8 text-center">
+                <div v-else-if="localTurnStatus === 'choosing'" class="rounded-xl border p-8 text-center">
                     <p class="text-lg font-semibold">
                         {{ currentTurn.player_name }} is choosing their topic…
                     </p>
@@ -95,9 +148,9 @@ async function pollState() {
                 </div>
 
                 <!-- Active player has chosen, now recording -->
-                <div v-else-if="currentTurn.status === 'recording'" class="rounded-xl border p-8 text-center">
+                <div v-else-if="localTurnStatus === 'recording'" class="rounded-xl border p-8 text-center">
                     <p class="text-lg font-semibold">
-                        {{ currentTurn.player_name }} is explaining their topic…
+                        {{ revealPlayerName }} is explaining their topic…
                     </p>
                 </div>
             </div>
@@ -118,7 +171,7 @@ async function pollState() {
             </div>
 
             <!-- It's this player's turn to choose -->
-            <div v-else-if="currentTurn.status === 'choosing' && isActivePlayer" class="space-y-4">
+            <div v-else-if="localTurnStatus === 'choosing' && isActivePlayer" class="space-y-4">
                 <div class="rounded-xl border p-6 text-center">
                     <p class="text-lg font-semibold">It's your turn!</p>
                     <p class="mt-1 text-muted-foreground">Choose the topic you'd like to explain.</p>
@@ -146,18 +199,33 @@ async function pollState() {
                 </div>
             </div>
 
+            <!-- Active player chose — mic test placeholder (US-010 will implement fully) -->
+            <div v-else-if="localTurnStatus === 'recording' && isActivePlayer && !showCountdown" class="rounded-xl border p-8 text-center space-y-4">
+                <p class="text-lg font-semibold">You chose: {{ currentTurn.chosen_topic_text }}</p>
+                <p class="text-muted-foreground">Mic check coming up…</p>
+            </div>
+
+            <!-- Topic reveal countdown (non-active observing) -->
+            <div v-else-if="showCountdown" class="rounded-xl border p-8 text-center space-y-4">
+                <p class="text-lg font-semibold">
+                    {{ revealPlayerName }} has chosen to explain:
+                </p>
+                <p class="text-2xl font-bold text-primary">{{ revealTopicText }}</p>
+                <p class="text-muted-foreground text-lg">Get Ready… {{ countdownSeconds }}</p>
+            </div>
+
             <!-- Another player is choosing -->
-            <div v-else-if="currentTurn.status === 'choosing' && !isActivePlayer" class="rounded-xl border p-8 text-center">
+            <div v-else-if="localTurnStatus === 'choosing' && !isActivePlayer" class="rounded-xl border p-8 text-center">
                 <p class="text-lg font-semibold">
                     {{ currentTurn.player_name }} is choosing their topic…
                 </p>
                 <p class="mt-2 text-muted-foreground">Hang tight!</p>
             </div>
 
-            <!-- Active player has chosen, now recording -->
-            <div v-else-if="currentTurn.status === 'recording'" class="rounded-xl border p-8 text-center">
+            <!-- Active player is recording -->
+            <div v-else-if="localTurnStatus === 'recording'" class="rounded-xl border p-8 text-center">
                 <p class="text-lg font-semibold">
-                    {{ currentTurn.player_name }} is explaining their topic…
+                    {{ revealPlayerName }} is explaining their topic…
                 </p>
             </div>
         </div>
