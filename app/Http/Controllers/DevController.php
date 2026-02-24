@@ -95,6 +95,26 @@ class DevController extends Controller
         return redirect("/games/{$game->code}/results/{$turn->id}");
     }
 
+    public function completedGame()
+    {
+        if (app()->environment('production')) {
+            abort(404);
+        }
+
+        $veteran = User::where('email', 'host-veteran@dev.test')->firstOrFail();
+        Auth::loginUsingId($veteran->id);
+
+        $game = Game::where('host_user_id', $veteran->id)
+            ->where('status', 'complete')
+            ->first();
+
+        if (! $game) {
+            abort(404, 'No completed game found. Please run db:seed first.');
+        }
+
+        return redirect("/games/{$game->code}/complete");
+    }
+
     private function randomGuestName(): string
     {
         $adjectives = ['Sneaky', 'Bold', 'Clever', 'Rapid', 'Gentle', 'Brave', 'Witty', 'Calm', 'Fierce', 'Jolly'];

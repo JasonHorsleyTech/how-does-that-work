@@ -45,6 +45,8 @@ Route::post('games/{code}/advance', [TurnController::class, 'advance'])->name('g
 Route::get('games/{code}/round-complete', [TurnController::class, 'roundComplete'])->name('games.round-complete');
 Route::post('games/{code}/start-next-round', [TurnController::class, 'startNextRound'])->name('games.start-next-round');
 Route::post('games/{code}/finalize', [TurnController::class, 'finalizeGame'])->name('games.finalize');
+Route::get('games/{code}/complete', [TurnController::class, 'complete'])->name('games.complete');
+Route::post('games/{code}/play-again', [TurnController::class, 'playAgain'])->name('games.play-again');
 
 Route::get('join/{code}', [JoinController::class, 'show'])->name('games.join.show');
 Route::post('join/{code}', [JoinController::class, 'store'])->name('games.join.store');

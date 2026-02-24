@@ -8,4 +8,5 @@ Route::prefix('dev')->group(function () {
     Route::get('/login-as/{userId}', [DevController::class, 'loginAs'])->name('dev.login-as');
     Route::get('/join-game/{code}', [DevController::class, 'joinGame'])->name('dev.join-game');
     Route::get('/completed-turn', [DevController::class, 'completedTurn'])->name('dev.completed-turn');
+    Route::get('/completed-game', [DevController::class, 'completedGame'])->name('dev.completed-game');
 });

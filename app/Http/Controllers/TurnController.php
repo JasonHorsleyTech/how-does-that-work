@@ -21,6 +21,10 @@ class TurnController extends Controller
             abort(403);
         }
 
+        if ($game->status === 'complete') {
+            return redirect("/games/{$game->code}/complete");
+        }
+
         if ($game->status === 'round_complete') {
             return redirect("/games/{$game->code}/round-complete");
         }
@@ -436,6 +440,88 @@ class TurnController extends Controller
         ]);
 
         return redirect("/games/{$game->code}/complete");
+    }
+
+    public function complete(string $code, Request $request)
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        [$player] = $this->resolvePlayer($game, $request);
+
+        if (! $player) {
+            abort(403);
+        }
+
+        $players = $game->players()
+            ->orderByDesc('score')
+            ->get(['id', 'name', 'score', 'is_host']);
+
+        $allTurns = $game->turns()
+            ->where('status', 'complete')
+            ->with(['player', 'topic'])
+            ->orderBy('round_number')
+            ->orderBy('turn_order')
+            ->get();
+
+        return Inertia::render('games/Complete', [
+            'game' => [
+                'id' => $game->id,
+                'code' => $game->code,
+                'status' => $game->status,
+                'current_round' => $game->current_round,
+                'max_rounds' => $game->max_rounds,
+            ],
+            'player' => [
+                'id' => $player->id,
+                'name' => $player->name,
+                'is_host' => $player->is_host,
+            ],
+            'players' => $players->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'score' => $p->score,
+                'is_host' => $p->is_host,
+            ]),
+            'allTurns' => $allTurns->map(fn ($t) => [
+                'id' => $t->id,
+                'player_id' => $t->player_id,
+                'player_name' => $t->player->name,
+                'topic_text' => $t->topic?->text,
+                'grade' => $t->grade,
+                'score' => $t->score,
+                'round_number' => $t->round_number,
+            ]),
+        ]);
+    }
+
+    public function playAgain(string $code, Request $request)
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        [$player, $isHost] = $this->resolvePlayer($game, $request);
+
+        if (! $player || ! $isHost || ! $request->user()) {
+            abort(403);
+        }
+
+        $newGame = Game::create([
+            'host_user_id' => $request->user()->id,
+            'code' => Game::generateUniqueCode(),
+            'status' => 'lobby',
+            'current_round' => 1,
+            'max_rounds' => $game->max_rounds,
+            'state_updated_at' => now(),
+        ]);
+
+        $newGame->players()->create([
+            'user_id' => $request->user()->id,
+            'name' => $request->user()->name,
+            'is_host' => true,
+            'has_submitted' => false,
+            'score' => 0,
+        ]);
+
+        return redirect("/games/{$newGame->code}/lobby");
     }
 
     private function resolvePlayer(Game $game, Request $request): array
