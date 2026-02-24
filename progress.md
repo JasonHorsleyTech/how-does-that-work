@@ -99,6 +99,21 @@
   - `assertInertia` in PEST uses a closure: `$response->assertInertia(fn ($page) => $page->component('games/Lobby')->has('game')->has('joinUrl'))`
 ---
 
+## 2026-02-24 - US-006
+- Added `GameController::startGame()` — POST `/games/{code}/start-game` (auth + host only); validates game is in `submitting` status, transitions to `playing`, redirects to `/games/{code}/play`
+- Updated `GameController::submissionStatus()` to include `players` array (name + has_submitted only, never topic text) for host's real-time progress view
+- Updated `TopicController::show()` to pass `players` prop with submission status to the page (no topic text ever exposed)
+- Rewrote `Submit.vue` host view: two-column layout with submission form (left) + player progress panel + "Start Game" button (right); "Start Game" always enabled; player list shows checkmark/pending indicators per player; polling now always starts for host (not just after host submits)
+- Added 7 PEST feature tests in `tests/Feature/StartGameTest.php` covering: force-start (transitions to playing), force-start with zero submissions, non-host 403, unauthenticated 401, wrong-status error, submission-status includes player data, submit page passes players prop
+- **Files changed:** `GameController.php`, `TopicController.php`, `routes/web.php`, `Submit.vue`, `StartGameTest.php` (new)
+- **Learnings for future iterations:**
+  - When adding player list data to API endpoints, always `->map()` to only expose `name` + `has_submitted` — never include topic text or IDs that could leak info
+  - The dual-auth pattern (user session vs session-based guest) is in both GameController and TopicController — any new game-phase endpoint must implement the same pattern
+  - `startForm = useForm({})` with `.post()` is the clean way to do a host-only action button (no payload needed, but CSRF + processing state managed automatically)
+  - Host polling should always start on mount (not gated on `has_submitted`) so the player list is live from the moment the host loads the page
+
+---
+
 ## 2026-02-24 - US-004
 - Moved `GET /games/{code}/lobby` out of auth middleware group; lobby is now accessible to both authenticated hosts and session-based guest players
 - Added `GET /games/{code}/players` polling endpoint returning JSON `{ players, nonHostCount }`
