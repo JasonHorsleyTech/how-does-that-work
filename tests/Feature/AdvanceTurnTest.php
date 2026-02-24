@@ -125,7 +125,7 @@ test('host advance transitions to round_complete when no pending turns remain', 
 
     $response = $this->actingAs($host)->post("/games/{$game->code}/advance");
 
-    $response->assertRedirect("/games/{$game->code}/play");
+    $response->assertRedirect("/games/{$game->code}/round-complete");
 
     $game->refresh();
     expect($game->status)->toBe('round_complete');

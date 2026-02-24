@@ -21,6 +21,10 @@ class TurnController extends Controller
             abort(403);
         }
 
+        if ($game->status === 'round_complete') {
+            return redirect("/games/{$game->code}/round-complete");
+        }
+
         if ($game->status !== 'playing') {
             return redirect("/games/{$game->code}/lobby");
         }
@@ -313,7 +317,7 @@ class TurnController extends Controller
 
         $nextTurn = $game->turns()
             ->where('status', 'pending')
-            ->orderBy('round_number')
+            ->where('round_number', $game->current_round)
             ->orderBy('turn_order')
             ->first();
 
@@ -323,14 +327,115 @@ class TurnController extends Controller
                 'status' => 'playing',
                 'state_updated_at' => now(),
             ]);
-        } else {
-            $game->update([
-                'status' => 'round_complete',
-                'state_updated_at' => now(),
-            ]);
+
+            return redirect("/games/{$game->code}/play");
         }
 
+        $game->update([
+            'status' => 'round_complete',
+            'state_updated_at' => now(),
+        ]);
+
+        return redirect("/games/{$game->code}/round-complete");
+    }
+
+    public function roundComplete(string $code, Request $request)
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        [$player] = $this->resolvePlayer($game, $request);
+
+        if (! $player) {
+            abort(403);
+        }
+
+        $players = $game->players()
+            ->orderByDesc('score')
+            ->get(['id', 'name', 'score', 'is_host']);
+
+        $roundTurns = $game->turns()
+            ->where('round_number', $game->current_round)
+            ->where('status', 'complete')
+            ->with(['player', 'topic'])
+            ->orderBy('turn_order')
+            ->get();
+
+        return Inertia::render('games/RoundComplete', [
+            'game' => [
+                'id' => $game->id,
+                'code' => $game->code,
+                'status' => $game->status,
+                'current_round' => $game->current_round,
+                'max_rounds' => $game->max_rounds,
+            ],
+            'player' => [
+                'id' => $player->id,
+                'name' => $player->name,
+                'is_host' => $player->is_host,
+            ],
+            'players' => $players->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'score' => $p->score,
+                'is_host' => $p->is_host,
+            ]),
+            'roundTurns' => $roundTurns->map(fn ($t) => [
+                'id' => $t->id,
+                'player_name' => $t->player->name,
+                'topic_text' => $t->topic?->text,
+                'grade' => $t->grade,
+                'score' => $t->score,
+            ]),
+        ]);
+    }
+
+    public function startNextRound(string $code, Request $request)
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        [$player, $isHost] = $this->resolvePlayer($game, $request);
+
+        if (! $player || ! $isHost) {
+            abort(403);
+        }
+
+        $nextRound = $game->current_round + 1;
+
+        $firstTurn = $game->turns()
+            ->where('round_number', $nextRound)
+            ->where('status', 'pending')
+            ->orderBy('turn_order')
+            ->first();
+
+        if ($firstTurn) {
+            $firstTurn->update(['status' => 'choosing']);
+        }
+
+        $game->update([
+            'status' => 'playing',
+            'current_round' => $nextRound,
+            'state_updated_at' => now(),
+        ]);
+
         return redirect("/games/{$game->code}/play");
+    }
+
+    public function finalizeGame(string $code, Request $request)
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        [$player, $isHost] = $this->resolvePlayer($game, $request);
+
+        if (! $player || ! $isHost) {
+            abort(403);
+        }
+
+        $game->update([
+            'status' => 'complete',
+            'state_updated_at' => now(),
+        ]);
+
+        return redirect("/games/{$game->code}/complete");
     }
 
     private function resolvePlayer(Game $game, Request $request): array

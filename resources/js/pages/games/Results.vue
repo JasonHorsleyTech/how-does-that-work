@@ -73,12 +73,18 @@ async function pollState() {
         const response = await fetch(`/games/${props.game.code}/play-state`);
         if (!response.ok) return;
         const data = await response.json();
-        if (data.gameStatus === 'playing' || data.gameStatus === 'round_complete') {
+        if (data.gameStatus === 'playing') {
             if (pollInterval !== null) {
                 clearInterval(pollInterval);
                 pollInterval = null;
             }
             window.location.href = `/games/${props.game.code}/play`;
+        } else if (data.gameStatus === 'round_complete') {
+            if (pollInterval !== null) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+            window.location.href = `/games/${props.game.code}/round-complete`;
         }
     } catch {
         // ignore transient errors
