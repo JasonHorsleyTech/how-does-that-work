@@ -166,6 +166,13 @@ class GameController extends Controller
 
         $turnAssignment->assignTurns($game);
 
+        // Activate the first turn so the active player can choose their topic
+        $game->turns()
+            ->where('round_number', 1)
+            ->orderBy('turn_order')
+            ->first()
+            ?->update(['status' => 'choosing']);
+
         return redirect("/games/{$game->code}/play");
     }
 }
