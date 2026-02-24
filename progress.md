@@ -342,3 +342,23 @@
   - Non-host polling on Results.vue is gated by `!props.player.is_host` — hosts navigate via Inertia form post redirect, not polling
   - `state_updated_at` should always be updated in any state-transition endpoint so that polling clients can detect the change
 ---
+
+## 2026-02-24 - US-016
+- Fixed `TurnController::advance()` to scope pending turn search to `$game->current_round` only (prevents pre-generated round 2 turns from being activated instead of triggering round_complete)
+- Changed `advance()` redirect to `/games/{code}/round-complete` when transitioning to `round_complete`
+- Updated `TurnController::show()` to redirect to `/games/{code}/round-complete` if game status is `round_complete`
+- Added `TurnController::roundComplete()` — GET `/games/{code}/round-complete`: returns RoundComplete Inertia page with game, player, players (sorted by score), roundTurns (complete turns for current round with grade/score)
+- Added `TurnController::startNextRound()` — POST `/games/{code}/start-next-round`: host-only; increments current_round, activates first pending turn for next round, sets game to playing
+- Added `TurnController::finalizeGame()` — POST `/games/{code}/finalize`: host-only; sets game to 'complete', redirects to `/games/{code}/complete` (stub for US-017)
+- Created `resources/js/pages/games/RoundComplete.vue`: host view (AppLayout) + guest view; shows round header, grade history for current round, full scoreboard; host sees "Start Round N" button or "View Final Results" button; non-host polls for game transition
+- Updated `Results.vue` polling: navigates to `/games/{code}/round-complete` when `gameStatus === 'round_complete'` (was incorrectly navigating to /play)
+- Added 3 new routes: GET round-complete, POST start-next-round, POST finalize
+- Updated AdvanceTurnTest.php: changed round_complete redirect assertion from `/play` to `/round-complete`
+- 10 PEST feature tests in `RoundCompleteTest.php` covering: host/guest access, scoreboard sorting, grade history, max_rounds prop, start-next-round, access control, and the full round_complete transition
+- **Files changed:** `TurnController.php`, `routes/web.php`, `RoundComplete.vue` (new), `Results.vue`, `RoundCompleteTest.php` (new), `AdvanceTurnTest.php`
+- **Learnings for future iterations:**
+  - `advance()` must scope pending turn search to `current_round` — without this, pre-generated round 2 turns would be activated prematurely in multi-round games
+  - `TurnAssignmentService` pre-generates turns for ALL rounds upfront; "Start Round N" just activates the first pending turn for that round and increments `game.current_round`
+  - Results.vue polling was checking for both `playing` AND `round_complete` to navigate to `/play` — this was wrong; `round_complete` should navigate to `/round-complete`
+  - The `finalizeGame()` stub redirects to `/games/{code}/complete` which US-017 will implement; the game status transitions to 'complete' so US-017 can check for it
+---
