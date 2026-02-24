@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\ApiUsageLog;
 use App\Models\Turn;
 use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -27,6 +28,15 @@ class TranscribeAudio implements ShouldQueue
             return;
         }
 
+        $this->turn->load('game');
+        $host = User::find($this->turn->game->host_user_id);
+
+        if (! $host || $host->credits <= 0) {
+            $this->markFailed('Host ran out of credits.');
+
+            return;
+        }
+
         try {
             $stream = Storage::disk('local')->readStream($audioPath);
 
@@ -45,12 +55,15 @@ class TranscribeAudio implements ShouldQueue
 
             $this->turn->update(['transcript' => $transcript]);
 
-            // Deduct 1 credit from the host for this transcription call
-            $this->turn->load('game');
-            $host = User::find($this->turn->game->host_user_id);
-            if ($host && $host->credits > 0) {
-                $host->decrement('credits');
-            }
+            $host->decrement('credits');
+
+            ApiUsageLog::create([
+                'game_id' => $this->turn->game->id,
+                'user_id' => $host->id,
+                'type' => 'whisper',
+                'tokens_used' => null,
+                'cost_credits' => 1,
+            ]);
 
             dispatch(new GradeTurn($this->turn));
         } catch (Throwable $e) {

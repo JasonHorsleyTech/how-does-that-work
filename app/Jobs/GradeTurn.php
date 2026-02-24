@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\ApiUsageLog;
 use App\Models\Turn;
 use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,6 +29,18 @@ class GradeTurn implements ShouldQueue
         }
 
         $turn->load('player', 'topic', 'game');
+
+        $host = User::find($turn->game->host_user_id);
+
+        if (! $host || $host->credits <= 0) {
+            $turn->update(['status' => 'grading_failed']);
+            $turn->game->update([
+                'status' => 'grading_complete',
+                'state_updated_at' => now(),
+            ]);
+
+            return;
+        }
 
         $topicText = $turn->topic?->text ?? 'Unknown topic';
         $transcript = $turn->transcript ?? '';
@@ -79,11 +92,15 @@ PROMPT;
 
         $turn->player->increment('score', $score);
 
-        // Deduct 1 credit from the host for this grading call
-        $host = User::find($turn->game->host_user_id);
-        if ($host && $host->credits > 0) {
-            $host->decrement('credits');
-        }
+        $host->decrement('credits');
+
+        ApiUsageLog::create([
+            'game_id' => $turn->game->id,
+            'user_id' => $host->id,
+            'type' => 'gpt',
+            'tokens_used' => $response->usage?->totalTokens ?? null,
+            'cost_credits' => 1,
+        ]);
 
         $turn->game->update([
             'status' => 'grading_complete',
