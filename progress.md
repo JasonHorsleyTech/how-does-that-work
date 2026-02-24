@@ -291,3 +291,19 @@
   - SQLite supports `ALTER TABLE ... CHANGE` via doctrine/dbal — the `grading_failed` enum migration works in both MySQL (production) and SQLite (tests)
   - `Storage::disk('local')->readStream($path)` is the way to get a file stream for OpenAI's audio transcribe API; it expects a resource/stream, not a file path string
 ---
+
+## 2026-02-24 - US-013
+- Implemented `GradeTurn` job: calls `gpt-4o-mini` with a structured prompt (topic + transcript), parses JSON response, stores all grading fields, increments player score, sets turn to `complete` and game to `grading_complete`
+- Added retry logic: `public int $tries = 3` + throws `RuntimeException` on malformed/missing JSON keys; `failed()` sets turn status to `grading_failed`
+- Added `response_format: json_object` to GPT call for more reliable JSON output
+- Created migration `2026_02_24_000008_add_grading_complete_to_games_status.php`: adds `grading_complete` and `round_complete` to games.status enum (round_complete needed by US-015/016)
+- Score is clamped to 0–100 range in case GPT returns out-of-range values
+- 8 PEST feature tests in `GradeTurnTest.php` covering: all fields stored, player score incremented, increments on top of existing score, game status set, malformed JSON throws, missing keys throws, failed() sets grading_failed, score clamping
+- **Files changed:** `app/Jobs/GradeTurn.php`, `database/migrations/2026_02_24_000008_add_grading_complete_to_games_status.php`, `tests/Feature/GradeTurnTest.php`
+- **Learnings for future iterations:**
+  - `CreateResponse::fake(['choices' => [['index' => 0, 'message' => ['role' => 'assistant', 'content' => '...'], 'finish_reason' => 'stop']]])` is the correct pattern for faking GPT chat responses; must include `role` in the message object
+  - Helper function names in PEST test files must be globally unique — `makeGradingTurn` was taken by `TranscribeAudioTest.php`, so use `buildGradeTurnFixture` etc.
+  - `$turn->fresh()->load('player', 'topic', 'game')` is the pattern to reload a turn with all needed relationships at the start of a job handle (stale model from constructor)
+  - `$turn->player->increment('score', $score)` is the atomic increment pattern — avoids race conditions vs `$player->score += $score; $player->save()`
+  - Adding `round_complete` to the games enum now saves another migration later (US-015/016 need it)
+---
