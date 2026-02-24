@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Game extends Model
 {
@@ -47,5 +48,14 @@ class Game extends Model
     public function turns(): HasMany
     {
         return $this->hasMany(Turn::class);
+    }
+
+    public static function generateUniqueCode(): string
+    {
+        do {
+            $code = strtoupper(Str::random(6));
+        } while (static::where('code', $code)->exists());
+
+        return $code;
     }
 }
