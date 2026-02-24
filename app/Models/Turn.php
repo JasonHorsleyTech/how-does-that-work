@@ -14,6 +14,7 @@ class Turn extends Model
         'game_id',
         'player_id',
         'topic_id',
+        'topic_choices',
         'round_number',
         'turn_order',
         'status',
@@ -30,6 +31,7 @@ class Turn extends Model
     protected function casts(): array
     {
         return [
+            'topic_choices' => 'array',
             'round_number' => 'integer',
             'turn_order' => 'integer',
             'score' => 'integer',

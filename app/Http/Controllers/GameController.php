@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Game;
 use App\Models\Player;
+use App\Services\TurnAssignmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -145,7 +146,7 @@ class GameController extends Controller
         ]);
     }
 
-    public function startGame(string $code, Request $request)
+    public function startGame(string $code, Request $request, TurnAssignmentService $turnAssignment)
     {
         $game = Game::where('code', strtoupper($code))->firstOrFail();
 
@@ -162,6 +163,8 @@ class GameController extends Controller
             'status' => 'playing',
             'state_updated_at' => now(),
         ]);
+
+        $turnAssignment->assignTurns($game);
 
         return redirect("/games/{$game->code}/play");
     }
