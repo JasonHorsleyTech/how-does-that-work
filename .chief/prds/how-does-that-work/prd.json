@@ -1,0 +1,322 @@
+{
+  "project": "How Does That Work? — Party Game Web App",
+  "description": "\"How Does That Work?\" is a party game where players reveal just how little they understand about everyday things — and just how magical the world actually is. Each player submits three topics (e.g., \"How does a pipe organ work?\", \"How does glue work?\"). Players are then asked to explain topics submitted by others, judged in real time by an LLM that scores their explanation and shows where they went wrong. The web app supports remote play (everyone on their own device) and local play (gathered around one screen). The host creates a game room, shares a link or QR code, players join from their phones or laptops, and the game proceeds round by round until a winner is declared.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Database schema — games, players, topics, turns",
+      "description": "As a developer, I need the core data models so that all game state can be persisted and queried.",
+      "acceptanceCriteria": [
+        "Migration creates `games` table: `id`, `host_user_id`, `code` (unique 6-char slug), `status` (enum: `lobby|submitting|playing|grading|complete`), `current_round`, `max_rounds` (default 1), `state_updated_at`, `timestamps`",
+        "Migration creates `players` table: `id`, `game_id`, `user_id` (nullable FK), `name`, `is_host` (boolean), `has_submitted` (boolean, default false), `score` (integer, default 0), `timestamps`",
+        "Migration creates `topics` table: `id`, `game_id`, `submitted_by_player_id`, `text`, `is_used` (boolean, default false), `timestamps`",
+        "Migration creates `turns` table: `id`, `game_id`, `player_id`, `topic_id`, `round_number`, `turn_order`, `status` (enum: `pending|choosing|recording|grading|complete`), `audio_path` (nullable), `transcript` (nullable, text), `score` (nullable, integer 0–100), `grade` (nullable, varchar), `feedback` (nullable, text), `actual_explanation` (nullable, text), `started_at` (nullable), `completed_at` (nullable), `timestamps`",
+        "All foreign keys have proper indexes",
+        "`php artisan migrate` runs without errors",
+        "PEST unit tests confirm model relationships (Game hasMany Players, Game hasMany Topics, etc.)"
+      ],
+      "priority": 1,
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Host creates a game",
+      "description": "As a registered host, I want to create a new game room so that I can invite friends to play.",
+      "acceptanceCriteria": [
+        "Authenticated host can visit `/games/create` and submit a form with `max_rounds` (1 or 2)",
+        "A game record is created with status `lobby`, a unique 6-character `code`, and the host recorded as a player with `is_host = true`",
+        "Host is redirected to `/games/{code}/lobby`",
+        "The lobby page displays a shareable URL (`/join/{code}`) and a QR code image for that URL",
+        "PEST feature test: POST `/games` creates game, redirects correctly",
+        "PEST feature test: duplicate game codes are not generated"
+      ],
+      "priority": 2,
+      "passes": false
+    },
+    {
+      "id": "US-003",
+      "title": "Guest player joins a game via link",
+      "description": "As a guest player, I want to join a game via a shared link so that I don't need to register an account.",
+      "acceptanceCriteria": [
+        "Visiting `/join/{code}` while the game status is `lobby` shows a join form with a randomly pre-filled display name (e.g., \"Sneaky Ferret\", \"Bold Llama\" — two-word animal combos)",
+        "Player can edit the name before submitting",
+        "On submit, a `players` record is created with `user_id = null`, the chosen name, and `is_host = false`",
+        "Player's `player_id` is stored in the session so their device is recognized for the rest of the game",
+        "Joining a game in any status other than `lobby` shows an error: \"This game has already started\"",
+        "Joining a full game (10+ players) shows an error: \"This game is full\"",
+        "PEST feature test: guest can join, session is set, player record created"
+      ],
+      "priority": 3,
+      "passes": false
+    },
+    {
+      "id": "US-004",
+      "title": "Lobby — host sees connected players",
+      "description": "As a host, I want to see who has joined the lobby so I know when everyone is ready.",
+      "acceptanceCriteria": [
+        "`/games/{code}/lobby` shows a live-updating list of player names (via long polling, refresh every 3 seconds)",
+        "Host sees each player's name with an \"online\" indicator",
+        "Host sees a \"Start Submission Phase\" button, disabled until at least 2 non-host players have joined",
+        "Non-host players on the same page see \"Waiting for host to start…\" and the list of who has joined",
+        "PEST feature test: polling endpoint returns current player list"
+      ],
+      "priority": 4,
+      "passes": false
+    },
+    {
+      "id": "US-005",
+      "title": "Players submit their three topics",
+      "description": "As a player, I want to submit three things for others to explain so that there is content for the game.",
+      "acceptanceCriteria": [
+        "When host starts the submission phase, all players' screens transition to a submission form (via long poll detecting `status = submitting`)",
+        "Form shows three labeled text inputs: \"Topic 1\", \"Topic 2\", \"Topic 3\" with placeholder text like \"How does a microwave work?\"",
+        "Each topic must be non-empty and between 5 and 120 characters",
+        "On submit, all three `topics` records are created and `players.has_submitted` is set to `true`",
+        "After submitting, player sees \"Waiting for others to submit…\" and a count of how many players have submitted",
+        "A player cannot submit more than once (re-submitting shows an error)",
+        "PEST feature test: topics are created, has_submitted is set"
+      ],
+      "priority": 5,
+      "passes": false
+    },
+    {
+      "id": "US-006",
+      "title": "Host sees submission progress and can force-start",
+      "description": "As a host, I want to see who has submitted their topics (but not what they submitted) and start the game whenever I'm ready.",
+      "acceptanceCriteria": [
+        "Host's submission phase screen shows each player's name with a checkmark or pending indicator based on `has_submitted`",
+        "Host does NOT see the topic text — only submitted/not submitted status",
+        "Host sees a \"Start Game\" button, enabled at all times during the submission phase (even if not all players have submitted)",
+        "Clicking \"Start Game\" transitions game to `playing` status and triggers turn order generation",
+        "Players who had not submitted have no topics in the pool (they still play, they just can't contribute topics)",
+        "PEST feature test: host can force-start, status transitions correctly"
+      ],
+      "priority": 6,
+      "passes": false
+    },
+    {
+      "id": "US-007",
+      "title": "Turn order and topic assignment algorithm",
+      "description": "As a developer, I need to generate the turn order and pre-assign topic choices for each player so the game can proceed fairly.",
+      "acceptanceCriteria": [
+        "When game starts, players are shuffled randomly to create turn order",
+        "For each player's turn, 2 topics are selected from the pool: topics NOT submitted by that player, and NOT yet used (`is_used = false`)",
+        "If fewer than 2 eligible topics remain for a player, use 1; if 0 remain, skip that player's turn",
+        "Pre-generated turn `records` are inserted for round 1 (and round 2 if `max_rounds = 2`) with `status = pending`",
+        "The two pre-assigned topic choices are stored per turn (add a `turn_topic_choices` pivot or JSON column)",
+        "PEST unit test: assignment never gives a player their own topic",
+        "PEST unit test: a topic is not assigned to two different turns",
+        "PEST unit test: algorithm works correctly with 2, 5, and 10 players"
+      ],
+      "priority": 7,
+      "passes": false
+    },
+    {
+      "id": "US-008",
+      "title": "Active player chooses their topic",
+      "description": "As the active player, I want to pick which topic I'll explain so I have some agency in the game.",
+      "acceptanceCriteria": [
+        "The current turn's player sees two topic choice cards (e.g., \"Explain how a microwave works\" / \"Explain how glue works\") on their device",
+        "Other players' screens show \"{Player Name} is choosing their topic…\" (via long polling)",
+        "Active player clicks one card to select it; their turn `status` transitions to `recording` and the chosen topic's `is_used` is set to `true`",
+        "The unchosen topic is returned to the available pool (`is_used` remains `false`)",
+        "PEST feature test: selecting a topic updates turn status and marks topic used"
+      ],
+      "priority": 8,
+      "passes": false
+    },
+    {
+      "id": "US-009",
+      "title": "All players see the chosen topic",
+      "description": "As a non-active player, I want to see which topic was chosen so I can follow along.",
+      "acceptanceCriteria": [
+        "When the active player selects a topic, all other devices update (via long poll) to show: \"{Player Name} has chosen to explain: {Topic Text}\"",
+        "A \"Get Ready…\" countdown of 3 seconds is shown before the recording prompt appears",
+        "Active player's screen transitions to the mic test step",
+        "PEST feature test: polling state endpoint reflects chosen topic after selection"
+      ],
+      "priority": 9,
+      "passes": false
+    },
+    {
+      "id": "US-010",
+      "title": "Microphone test before recording",
+      "description": "As the active player, I want to confirm my microphone is working before my timer starts so I don't lose time to technical issues.",
+      "acceptanceCriteria": [
+        "Active player sees the instruction: \"Say 'testing, testing, one, two, three' to confirm your mic is working\"",
+        "The browser's `MediaRecorder` API is used to capture audio",
+        "Once speech is detected (audio level above threshold for at least 1 second), a \"Mic confirmed! Start explaining when ready.\" message and a \"Start My Turn\" button are shown",
+        "Player clicks \"Start My Turn\" to begin the official recording",
+        "Other players' screens show \"{Player Name} is checking their microphone…\"",
+        "Vitest unit test: audio level detection utility function works correctly"
+      ],
+      "priority": 10,
+      "passes": false
+    },
+    {
+      "id": "US-011",
+      "title": "Active player records their explanation",
+      "description": "As the active player, I want to record my spoken explanation with a visible timer so I know how much time I have left.",
+      "acceptanceCriteria": [
+        "A 2-minute (120 second) countdown timer is shown prominently",
+        "The topic text is shown on screen throughout the recording",
+        "A recording indicator (e.g., red pulsing dot) shows that recording is active",
+        "Player can click \"I'm Done\" at any time to stop recording early",
+        "When the timer hits 0:00, recording stops automatically",
+        "The recorded audio blob is uploaded as a POST to `/api/games/{code}/turns/{turn_id}/audio`",
+        "On successful upload, turn `status` transitions to `grading`",
+        "Other players' screens show \"{Player Name} is explaining… ({time remaining})\" updated every second via long poll",
+        "Vitest unit test: timer counts down correctly and emits stop event at 0"
+      ],
+      "priority": 11,
+      "passes": false
+    },
+    {
+      "id": "US-012",
+      "title": "Whisper API transcribes the audio",
+      "description": "As a developer, I need the uploaded audio to be transcribed via OpenAI Whisper so it can be graded.",
+      "acceptanceCriteria": [
+        "On audio upload, a queued Laravel job `TranscribeAudio` is dispatched",
+        "The job sends the audio file to `OpenAI Whisper` (`whisper-1` model) and stores the transcript in `turns.transcript`",
+        "If Whisper returns an error or empty transcript, turn `status` is set to `grading_failed` and a placeholder message is stored",
+        "On success, a second job `GradeTurn` is dispatched",
+        "Audio files are stored in `storage/app/audio/{game_code}/{turn_id}.webm`",
+        "PEST feature test: mock OpenAI client, confirm transcript is stored and next job is dispatched"
+      ],
+      "priority": 12,
+      "passes": false
+    },
+    {
+      "id": "US-013",
+      "title": "LLM grades the explanation",
+      "description": "As a developer, I need the transcript to be sent to OpenAI GPT for grading so players receive a fair, consistent score.",
+      "acceptanceCriteria": [
+        "The `GradeTurn` job sends a structured prompt to `gpt-4o-mini` containing: the topic text, the player's transcript, and instructions to return a JSON object with `score` (0–100 integer), `grade` (A/B/C/D/F), `feedback` (2–4 sentences on what they got right and wrong), and `actual_explanation` (a 3–5 sentence accurate explanation of the topic)",
+        "The response is parsed and stored in `turns.score`, `turns.grade`, `turns.feedback`, `turns.actual_explanation`",
+        "`players.score` is incremented by `turns.score`",
+        "Turn `status` is set to `complete`, game status is set to `grading_complete`",
+        "If GPT returns malformed JSON, the job retries up to 2 times before setting status to `grading_failed`",
+        "PEST feature test: mock GPT response, confirm all turn fields are populated and player score updated"
+      ],
+      "priority": 13,
+      "passes": false
+    },
+    {
+      "id": "US-014",
+      "title": "Results are shown to all players after a turn",
+      "description": "As a player, I want to see how well the active player did, including what they got wrong, so the game is entertaining and educational.",
+      "acceptanceCriteria": [
+        "When turn status becomes `complete`, all devices (via long poll) transition to a results screen for that turn",
+        "Results screen shows: player name, topic, grade badge (styled A=green, B=blue, C=yellow, D=orange, F=red), percentage score, feedback text, and actual explanation",
+        "If grading failed, a fallback message is shown: \"Grading failed — no score awarded\"",
+        "A \"waiting for host to continue…\" message is shown for non-host players",
+        "Host sees a \"Next Player →\" button to advance",
+        "Running scoreboard is shown at the bottom: all players sorted by current score",
+        "Playwright test: results page renders all fields correctly after a completed turn"
+      ],
+      "priority": 14,
+      "passes": false
+    },
+    {
+      "id": "US-015",
+      "title": "Host advances to the next turn",
+      "description": "As the host, I want to control when the game moves forward so the group has time to read and discuss results.",
+      "acceptanceCriteria": [
+        "Only the host's device shows the \"Next Player →\" button on the results screen",
+        "Clicking it sets the next pending turn to `choosing` status and updates `game.state_updated_at`",
+        "All players' long polls detect the state change and navigate to the next turn's choosing screen",
+        "If there are no more pending turns in the current round, the game transitions to `round_complete`",
+        "PEST feature test: POST `/games/{code}/advance` transitions to next turn correctly"
+      ],
+      "priority": 15,
+      "passes": false
+    },
+    {
+      "id": "US-016",
+      "title": "Round complete screen and scoreboard",
+      "description": "As a player, I want to see the full scoreboard at the end of a round so I know who is winning.",
+      "acceptanceCriteria": [
+        "When all turns in a round are complete, all devices show a round summary screen",
+        "Screen shows all players sorted by score, with their score and grade history for that round",
+        "If `max_rounds \u003e current_round`, host sees \"Start Round {n}\" button to begin the next round",
+        "If it was the final round, host sees \"View Final Results\" button",
+        "Clicking \"Start Round {n}\" generates fresh turn order for the new round using remaining unused topics",
+        "PEST feature test: round complete state is correct after all turns are done"
+      ],
+      "priority": 16,
+      "passes": false
+    },
+    {
+      "id": "US-017",
+      "title": "Game over — winner declared",
+      "description": "As a player, I want to see the final winner declared at the end of the game so there's a satisfying conclusion.",
+      "acceptanceCriteria": [
+        "Final results screen shows all players ranked by total score",
+        "First place player is highlighted with a winner banner: \"{Name} wins with {score} points!\"",
+        "Each player's turns are listed with the topic, grade, and score",
+        "A \"Play Again\" button for the host creates a new game (new code, same players if they wish to rejoin)",
+        "Playwright test: game over screen renders winner correctly"
+      ],
+      "priority": 17,
+      "passes": false
+    },
+    {
+      "id": "US-018",
+      "title": "Long polling state endpoint",
+      "description": "As a developer, I need a polling endpoint that returns the current game state so all clients can stay in sync without WebSockets.",
+      "acceptanceCriteria": [
+        "`GET /api/games/{code}/state` returns a JSON object with: `game.status`, `game.current_round`, `current_turn` (id, player name, topic if chosen, status, time_remaining), `players` (id, name, score, has_submitted), `last_updated` timestamp",
+        "Response is cached for 1 second to prevent hammering",
+        "Client polls every 3 seconds; on detecting a state change (comparing `last_updated`), triggers the appropriate Vue component transition",
+        "Unauthenticated requests require a valid `player_id` in the session",
+        "PEST feature test: endpoint returns correct shape for each game status",
+        "Vitest unit test: Vue polling composable calls endpoint at correct interval and emits state-change events"
+      ],
+      "priority": 18,
+      "passes": false
+    },
+    {
+      "id": "US-019",
+      "title": "User registration for hosts",
+      "description": "As a person who wants to host a game, I need to create an account so that billing and game history can be tracked.",
+      "acceptanceCriteria": [
+        "Registration form at `/register` requires email, password, and name (uses existing Laravel Fortify setup)",
+        "After registration, host is redirected to a dashboard at `/dashboard`",
+        "Dashboard shows past games with date, number of players, and winner",
+        "Only hosts need accounts; guest players join without registering",
+        "PEST feature test: registration creates user, redirects to dashboard"
+      ],
+      "priority": 19,
+      "passes": false
+    },
+    {
+      "id": "US-020",
+      "title": "Stripe billing via Laravel Cashier",
+      "description": "As a host, I want to add billing information so I can pay for LLM usage and run games.",
+      "acceptanceCriteria": [
+        "Laravel Cashier is installed and configured with Stripe",
+        "A `credits` integer column is added to the `users` table (default 0)",
+        "Host can visit `/billing` to purchase a credits pack: 100 credits for $2.00 via Stripe Checkout",
+        "Each game consumes credits based on usage: 1 credit per LLM grading call + 1 credit per Whisper transcription",
+        "If a host has 0 credits, the \"Start Game\" button is disabled with a message: \"Add credits to start a game\"",
+        "Stripe webhook at `/stripe/webhook` handles `checkout.session.completed` to top up credits",
+        "PEST feature test: webhook handler increments user credits correctly"
+      ],
+      "priority": 20,
+      "passes": false
+    },
+    {
+      "id": "US-021",
+      "title": "Track API usage per game",
+      "description": "As a developer, I need to record API calls per game so that usage is accurately deducted from host credits.",
+      "acceptanceCriteria": [
+        "An `api_usage_logs` table records: `id`, `game_id`, `user_id`, `type` (enum: `whisper|gpt`), `tokens_used` (nullable), `cost_credits`, `timestamps`",
+        "Each `TranscribeAudio` and `GradeTurn` job inserts a log record and deducts from `users.credits`",
+        "If credits reach 0 mid-game, remaining turns skip grading and show a \"Host ran out of credits\" message",
+        "PEST feature test: credits are deducted after each job runs"
+      ],
+      "priority": 21,
+      "passes": false
+    }
+  ]
+}
