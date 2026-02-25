@@ -20,6 +20,7 @@
 - **App Deployment**: Code at `/var/www/lordoftongs` (www-data owned), nginx at `/etc/nginx/sites-available/lordoftongs`, PHP-FPM socket `/run/php/php8.4-fpm.sock`; AWS CLI not on EC2 — fetch SSM secrets from local machine
 - **SSL**: Let's Encrypt cert at `/etc/letsencrypt/live/lordoftongs.com/`, certbot auto-renewal via systemd timer; nginx has 3 server blocks (HTTPS www redirect, HTTPS main app, HTTP catch-all redirect)
 - **DNS**: Route 53 hosted zone `Z0957605EPD65SZ5RD5H`; `lordoftongs.com` and `www.lordoftongs.com` → `18.213.144.0`
+- **Systemd Services**: `lordoftongs-worker.service` (queue worker, Restart=always), `lordoftongs-scheduler.service` + `lordoftongs-scheduler.timer` (schedule:run every minute); sudoers at `/etc/sudoers.d/lordoftongs-deploy` for passwordless restart
 
 ---
 
@@ -571,4 +572,21 @@
   - `curl --resolve domain:port:ip` bypasses local DNS cache for testing when DNS propagation is slow locally
   - Route 53 change batch supports multiple actions (UPSERT, CREATE, DELETE) in a single API call
   - Certbot auto-renewal timer is installed automatically on Ubuntu 24.04 with `python3-certbot-nginx`
+---
+
+## 2026-02-25 - Deploy US-008
+- Created systemd service `/etc/systemd/system/lordoftongs-worker.service`: runs `php artisan queue:work --sleep=3 --tries=3 --max-time=3600` as `www-data`, `Restart=always` with 5s restart delay, starts after `network.target` and `mysql.service`
+- Created systemd service `/etc/systemd/system/lordoftongs-scheduler.service`: `Type=oneshot`, runs `php artisan schedule:run --no-interaction` as `www-data`
+- Created systemd timer `/etc/systemd/system/lordoftongs-scheduler.timer`: `OnCalendar=*-*-* *:*:00` (every minute), `Persistent=true`
+- All three units enabled and started; worker is `active (running)`, timer is `active (waiting)` with next trigger confirmed
+- Scheduler confirmed to fire: journal shows "No scheduled commands are ready to run" at the minute mark (expected — no scheduled tasks defined yet)
+- Jobs table empty, failed_jobs table empty — worker is healthy
+- Created `/etc/sudoers.d/lordoftongs-deploy`: allows `ubuntu` user to restart worker and reload PHP-FPM without password (needed by US-009 deploy workflow)
+- No code changes — purely server-side systemd configuration
+- **Learnings for future iterations:**
+  - `Restart=always` + `RestartSec=5` ensures the worker recovers from crashes and restarts after `--max-time=3600` (1h) graceful exit
+  - Systemd timer + oneshot service is cleaner than cron for the scheduler — better logging via `journalctl -u lordoftongs-scheduler.service`
+  - `sudo -u www-data php artisan tinker` closures can't be serialized for queue dispatch — use `php artisan` commands or the app's actual job classes to test the worker
+  - `XDG_CONFIG_HOME=/tmp` workaround needed for psysh config dir when running tinker as `www-data`
+  - Sudoers file at `/etc/sudoers.d/lordoftongs-deploy` allows passwordless `systemctl restart lordoftongs-worker.service` and `systemctl reload php8.4-fpm` for the deploy user
 ---
