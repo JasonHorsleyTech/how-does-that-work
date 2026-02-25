@@ -17,6 +17,7 @@
 - **SSM Secrets**: 6 SecureString params under `/lordoftongs/prod/` (APP_KEY, DB_PASSWORD, OPENAI_API_KEY, STRIPE_KEY, STRIPE_SECRET, STRIPE_WEBHOOK_SECRET); IAM role `lordoftongs-ec2-role` + profile `lordoftongs-ec2-profile` on EC2
 - **MySQL Prod User**: `lordoftongs@localhost`, password `lgTZpHUieZT4EiVRK51ofTp6O6Ho68CL`, database `how_does_that_work`
 - **PHP PPA**: `ppa:ondrej/php` added for PHP 8.4 on Ubuntu 24.04 (not in default repos)
+- **App Deployment**: Code at `/var/www/lordoftongs` (www-data owned), nginx at `/etc/nginx/sites-available/lordoftongs`, PHP-FPM socket `/run/php/php8.4-fpm.sock`; AWS CLI not on EC2 — fetch SSM secrets from local machine
 
 ---
 
@@ -521,4 +522,27 @@
   - SSM `put-parameter --type SecureString` uses default AWS-managed KMS key (aws/ssm) — no custom KMS key needed
   - IAM role: `lordoftongs-ec2-role`, Instance profile: `lordoftongs-ec2-profile`, Association ID: `iip-assoc-052ec442a76d58991`
   - To retrieve on EC2: `aws ssm get-parameter --name "/lordoftongs/prod/APP_KEY" --with-decryption --query 'Parameter.Value' --output text --region us-east-1`
+---
+
+## 2026-02-25 - Deploy US-005
+- Cloned repo from GitHub to `/var/www/lordoftongs` on EC2 instance
+- Generated `.env` with production values: `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://lordoftongs.com`, `QUEUE_CONNECTION=database`, `CACHE_STORE=database`, `LOG_LEVEL=error`
+- Pulled all 6 secrets from SSM Parameter Store (APP_KEY, DB_PASSWORD, OPENAI_API_KEY, STRIPE_KEY, STRIPE_SECRET, STRIPE_WEBHOOK_SECRET) from local AWS CLI and wrote to `.env`
+- `composer install --no-dev --optimize-autoloader` — 91 packages installed, autoloader optimized
+- `npm ci && npm run build` — Vite built all assets in 13s to `public/build/`
+- `php artisan migrate --force` — all 18 migrations ran successfully (including Cashier tables)
+- `php artisan config:cache`, `route:cache`, `view:cache` — all cached
+- `php artisan storage:link` — public/storage linked
+- Set `/var/www/lordoftongs` ownership to `www-data:www-data`
+- Configured nginx virtual host (temporary HTTP-only for now, SSL in US-006) at `/etc/nginx/sites-available/lordoftongs`
+- App responds HTTP 200 on localhost and externally at `http://18.213.144.0/`
+- `php artisan about` confirms: Laravel 12.53.0, PHP 8.4.18, production, debug OFF, config/routes/views cached
+- No code changes — purely server-side deployment
+- **Learnings for future iterations:**
+  - AWS CLI is NOT installed on the EC2 instance — SSM secrets must be fetched from local machine and pushed via SSH
+  - `sudo git clone` creates repo owned by root; need `git config --global --add safe.directory` for ubuntu user, or just use `sudo` for git commands
+  - nginx config: `fastcgi_pass unix:/run/php/php8.4-fpm.sock` is the PHP-FPM socket path on Ubuntu 24.04 with Ondrej PPA
+  - The `.env` file needs `QUEUE_CONNECTION=database` (not `sync`) for production queue workers
+  - `sudo -u www-data php artisan` is the proper way to run artisan commands as the app user
+  - Deployment path: `/var/www/lordoftongs` with `public/` as document root
 ---
