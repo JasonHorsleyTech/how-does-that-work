@@ -12,6 +12,7 @@
 - Vitest (v4) configured via `vitest.config.ts`; test script is `npm run test:js`; test files live alongside source at `resources/js/**/*.test.ts`
 - Audio level detection: `calculateAudioLevel(Uint8Array)` returns RMS 0–1; `isSpeechDetected(level, threshold=0.01)` returns boolean; both in `resources/js/utils/audioLevel.ts`
 - Model factories go in `database/factories/`; use `Model::factory()` pattern
+- **AWS Deployment**: EC2 instance `i-02155d7de13125a95` (t3.small, Ubuntu 24.04) in us-east-1, Elastic IP `18.213.144.0`, SG `sg-0341e49f27cf3d05f`, SSH key `~/.ssh/lordoftongs-prod.pem`, SSH: `ssh -i ~/.ssh/lordoftongs-prod.pem ubuntu@18.213.144.0`
 
 ---
 
@@ -461,4 +462,21 @@
   - The remote main was already pushed at some point, so only the local ref needed updating
   - `git merge --ff-only origin/main` is the safe way to catch up a local branch without creating merge commits
   - The `.chief/` directory is gitignored, so PRD changes don't need to be committed
+---
+
+## 2026-02-24 - Deploy US-002
+- Terminated old EC2 instance `i-066a90b04d598adb5` (hdtw-web, t3.micro)
+- No old Elastic IPs existed to release
+- Created security group `sg-0341e49f27cf3d05f` (lordoftongs-prod-sg) allowing SSH/HTTP/HTTPS only
+- Created new SSH key pair `lordoftongs-prod`, saved to `~/.ssh/lordoftongs-prod.pem`
+- Launched new EC2 instance `i-02155d7de13125a95` (t3.small, Ubuntu 24.04 LTS, us-east-1)
+- Allocated Elastic IP `18.213.144.0` (`eipalloc-08801b790190de026`) and associated with instance
+- Instance tagged `Name=lordoftongs-prod`
+- Verified SSH access successfully
+- **Learnings for future iterations:**
+  - AWS CLI authenticated as `Ralph` IAM user (account 539503476624)
+  - Ubuntu 24.04 AMI naming pattern: `ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*` from owner `099720109477`
+  - Default VPC in us-east-1: `vpc-8dff35f0`
+  - Old hdtw-ec2-key was deleted and replaced with lordoftongs-prod key
+  - SSH to instance: `ssh -i ~/.ssh/lordoftongs-prod.pem ubuntu@18.213.144.0`
 ---
