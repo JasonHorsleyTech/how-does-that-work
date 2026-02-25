@@ -18,6 +18,8 @@
 - **MySQL Prod User**: `lordoftongs@localhost`, password `lgTZpHUieZT4EiVRK51ofTp6O6Ho68CL`, database `how_does_that_work`
 - **PHP PPA**: `ppa:ondrej/php` added for PHP 8.4 on Ubuntu 24.04 (not in default repos)
 - **App Deployment**: Code at `/var/www/lordoftongs` (www-data owned), nginx at `/etc/nginx/sites-available/lordoftongs`, PHP-FPM socket `/run/php/php8.4-fpm.sock`; AWS CLI not on EC2 — fetch SSM secrets from local machine
+- **SSL**: Let's Encrypt cert at `/etc/letsencrypt/live/lordoftongs.com/`, certbot auto-renewal via systemd timer; nginx has 3 server blocks (HTTPS www redirect, HTTPS main app, HTTP catch-all redirect)
+- **DNS**: Route 53 hosted zone `Z0957605EPD65SZ5RD5H`; `lordoftongs.com` and `www.lordoftongs.com` → `18.213.144.0`
 
 ---
 
@@ -545,4 +547,28 @@
   - The `.env` file needs `QUEUE_CONNECTION=database` (not `sync`) for production queue workers
   - `sudo -u www-data php artisan` is the proper way to run artisan commands as the app user
   - Deployment path: `/var/www/lordoftongs` with `public/` as document root
+---
+
+## 2026-02-25 - Deploy US-006 & US-007
+- **DNS (US-007)**: Updated Route 53 hosted zone `Z0957605EPD65SZ5RD5H`:
+  - `lordoftongs.com` A record updated from `99.159.86.81` → `18.213.144.0` (Elastic IP)
+  - `www.lordoftongs.com` A record created → `18.213.144.0`
+  - `jellyfin.lordoftongs.com` A record deleted (old home server)
+  - DNS propagation confirmed via authoritative NS
+- **SSL (US-006)**: Ran `certbot --nginx` on EC2 to obtain Let's Encrypt certificate for `lordoftongs.com` and `www.lordoftongs.com`
+  - Certificate stored at `/etc/letsencrypt/live/lordoftongs.com/` (expires 2026-05-26)
+  - TLS 1.3 (CHACHA20-POLY1305-SHA256)
+- **nginx config**: Rewrote `/etc/nginx/sites-available/lordoftongs` with 3 server blocks:
+  - HTTPS www redirect (443 ssl, www.lordoftongs.com → 301 to https://lordoftongs.com)
+  - HTTPS main app (443 ssl, lordoftongs.com, PHP-FPM via `/run/php/php8.4-fpm.sock`)
+  - HTTP catch-all (80, both domains → 301 to https://lordoftongs.com)
+- Certbot auto-renewal timer active (runs twice daily via systemd)
+- Verified: `https://lordoftongs.com` → 200, `http://lordoftongs.com` → 301 HTTPS, `https://www.lordoftongs.com` → 301 bare domain
+- No code changes — purely server-side and DNS work
+- **Learnings for future iterations:**
+  - DNS is a prerequisite for Certbot — must be done before SSL even though PRD ordered them separately
+  - `certbot --nginx --redirect` auto-modifies the nginx config, but the resulting config is messy (uses `if` blocks for redirects) — better to rewrite with clean separate server blocks
+  - `curl --resolve domain:port:ip` bypasses local DNS cache for testing when DNS propagation is slow locally
+  - Route 53 change batch supports multiple actions (UPSERT, CREATE, DELETE) in a single API call
+  - Certbot auto-renewal timer is installed automatically on Ubuntu 24.04 with `python3-certbot-nginx`
 ---
