@@ -8,6 +8,7 @@ import { dashboard } from '@/routes';
 
 defineProps<{
     credits: number;
+    creditsAdded: number;
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -26,7 +27,7 @@ const breadcrumbs: BreadcrumbItem[] = [
                 <div>
                     <h1 class="text-3xl font-bold tracking-tight">Payment Successful!</h1>
                     <p class="mt-2 text-muted-foreground">
-                        100 credits have been added to your account.
+                        {{ creditsAdded }} credits have been added to your account.
                     </p>
                 </div>
 

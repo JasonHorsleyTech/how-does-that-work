@@ -36,8 +36,40 @@ class BillingController extends Controller
 
     public function success(Request $request)
     {
+        $sessionId = $request->query('session_id');
+
+        if (! $sessionId) {
+            return redirect()->route('billing');
+        }
+
+        $user = $request->user();
+
+        // Retrieve the Stripe checkout session to verify payment
+        $stripe = new \Stripe\StripeClient(config('cashier.secret'));
+        $session = $stripe->checkout->sessions->retrieve($sessionId);
+
+        // Only credit if the payment was successful and hasn't already been applied
+        $creditsAdded = 0;
+        if ($session->payment_status === 'paid') {
+            // Use client_reference_id to verify this session belongs to this user
+            if ((int) $session->client_reference_id === $user->id) {
+                // Prevent double-crediting by checking if we've already processed this session
+                $alreadyProcessed = \Illuminate\Support\Facades\Cache::has("checkout_session_{$sessionId}");
+
+                if (! $alreadyProcessed) {
+                    $creditsAdded = 100;
+                    $user->increment('credits', $creditsAdded);
+                    $user->refresh();
+
+                    // Mark this session as processed (cache for 24 hours)
+                    \Illuminate\Support\Facades\Cache::put("checkout_session_{$sessionId}", true, now()->addHours(24));
+                }
+            }
+        }
+
         return Inertia::render('BillingSuccess', [
-            'credits' => $request->user()->credits,
+            'credits' => $user->credits,
+            'creditsAdded' => $creditsAdded ?: 100, // Show 100 even on revisit
         ]);
     }
 }
