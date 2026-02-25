@@ -1,0 +1,31 @@
+name: deploy
+
+on:
+  workflow_run:
+    workflows: ["tests"]
+    types:
+      - completed
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /var/www/lordoftongs
+            git pull origin main
+            composer install --no-dev --optimize-autoloader
+            npm ci && npm run build
+            php artisan migrate --force
+            php artisan config:cache && php artisan route:cache && php artisan view:cache
+            sudo systemctl reload php8.4-fpm
+            sudo systemctl restart lordoftongs-worker

@@ -590,3 +590,18 @@
   - `XDG_CONFIG_HOME=/tmp` workaround needed for psysh config dir when running tinker as `www-data`
   - Sudoers file at `/etc/sudoers.d/lordoftongs-deploy` allows passwordless `systemctl restart lordoftongs-worker.service` and `systemctl reload php8.4-fpm` for the deploy user
 ---
+
+## 2026-02-25 - Deploy US-009
+- Created `.github/workflows/deploy.yml` — GitHub Actions deploy workflow
+- Workflow triggers via `workflow_run` after the `tests` workflow completes successfully on `main` branch
+- Uses `appleboy/ssh-action@v1` to SSH into EC2 and run deployment commands
+- Deployment steps: `git pull origin main`, `composer install --no-dev --optimize-autoloader`, `npm ci && npm run build`, `php artisan migrate --force`, cache commands (`config:cache`, `route:cache`, `view:cache`), `sudo systemctl reload php8.4-fpm`, `sudo systemctl restart lordoftongs-worker`
+- Stored `EC2_SSH_KEY` (SSH private key from `~/.ssh/lordoftongs-prod.pem`) and `EC2_HOST` (`18.213.144.0`) as GitHub Actions secrets via `gh secret set`
+- Existing `lint.yml` and `tests.yml` workflows unchanged and still pass
+- **Files changed:** `.github/workflows/deploy.yml`
+- **Learnings for future iterations:**
+  - `workflow_run` triggers when ANY listed workflow completes — must add `if: ${{ github.event.workflow_run.conclusion == 'success' }}` to only deploy on success
+  - `appleboy/ssh-action@v1` handles SSH connection/cleanup cleanly — no need to manually manage SSH keys in the runner
+  - `gh secret set KEY < file` pipes file contents directly as the secret value (useful for PEM keys)
+  - Deploy workflow depends on tests but not lint (lint is a code quality gate, not a deploy blocker) — this matches the acceptance criteria
+---
