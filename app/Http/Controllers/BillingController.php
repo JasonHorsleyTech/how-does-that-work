@@ -28,7 +28,7 @@ class BillingController extends Controller
                 'client_reference_id' => (string) $user->id,
             ]);
 
-            return redirect($checkout->url);
+            return Inertia::location($checkout->url);
         } catch (IncompletePayment $e) {
             return redirect()->route('cashier.payment', [$e->payment->id, 'redirect' => route('billing')]);
         }
