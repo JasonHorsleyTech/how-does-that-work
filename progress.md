@@ -605,3 +605,19 @@
   - `gh secret set KEY < file` pipes file contents directly as the secret value (useful for PEM keys)
   - Deploy workflow depends on tests but not lint (lint is a code quality gate, not a deploy blocker) — this matches the acceptance criteria
 ---
+
+## 2026-02-25 - Deploy US-010
+- Smoke tested the full production deployment at https://lordoftongs.com
+- All acceptance criteria verified:
+  - Landing page (Welcome.vue) loads correctly with title, tagline, Host/Join CTAs, How to Play section
+  - SSL certificate valid (Let's Encrypt, expires May 26 2026), HTTP→HTTPS redirect working (301)
+  - Full host flow tested: Register → Dashboard → Create Game → Lobby (game M1QXQO created with QR code, shareable link, player list)
+  - nginx access logs show successful 200 responses for page and asset requests
+  - Queue worker (`lordoftongs-worker.service`) and scheduler timer both active; `failed_jobs` table empty
+  - `php artisan about` confirms: Laravel 12.53.0, PHP 8.4.18, production env, debug OFF, config/routes/views cached, MySQL driver, database queue
+- **No code changes** — this was a verification-only story
+- **Learnings for future iterations:**
+  - `openssl s_client` + `x509 -noout -dates` is a quick local way to verify SSL cert details without a browser
+  - New user registration on prod works (Fortify auth flow intact after deploy)
+  - Game creation deducts no credits for the smoke test user (default 0 credits, game creation doesn't require credits)
+---
