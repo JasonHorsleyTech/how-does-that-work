@@ -14,6 +14,7 @@
 - Model factories go in `database/factories/`; use `Model::factory()` pattern
 - **AWS Deployment**: EC2 instance `i-02155d7de13125a95` (t3.small, Ubuntu 24.04) in us-east-1, Elastic IP `18.213.144.0`, SG `sg-0341e49f27cf3d05f`, SSH key `~/.ssh/lordoftongs-prod.pem`, SSH: `ssh -i ~/.ssh/lordoftongs-prod.pem ubuntu@18.213.144.0`
 - **Server Stack**: nginx 1.24, PHP 8.4 (Ondrej PPA) + FPM, MySQL 8.0, Composer 2.9, Node.js 20 (NodeSource), Certbot 2.9
+- **SSM Secrets**: 6 SecureString params under `/lordoftongs/prod/` (APP_KEY, DB_PASSWORD, OPENAI_API_KEY, STRIPE_KEY, STRIPE_SECRET, STRIPE_WEBHOOK_SECRET); IAM role `lordoftongs-ec2-role` + profile `lordoftongs-ec2-profile` on EC2
 - **MySQL Prod User**: `lordoftongs@localhost`, password `lgTZpHUieZT4EiVRK51ofTp6O6Ho68CL`, database `how_does_that_work`
 - **PHP PPA**: `ppa:ondrej/php` added for PHP 8.4 on Ubuntu 24.04 (not in default repos)
 
@@ -502,4 +503,22 @@
   - `DEBIAN_FRONTEND=noninteractive` is needed for `apt-get install mysql-server` to avoid interactive prompts over SSH
   - MySQL on Ubuntu 24.04 uses `auth_socket` plugin for root by default — use `sudo mysql` (no password) to create the app user, then the app user uses `mysql_native_password`
   - MySQL app user password: `lgTZpHUieZT4EiVRK51ofTp6O6Ho68CL` (will be stored in SSM in US-004)
+---
+
+## 2026-02-24 - Deploy US-004
+- Created 6 SSM SecureString parameters under `/lordoftongs/prod/`: APP_KEY, DB_PASSWORD, OPENAI_API_KEY, STRIPE_KEY, STRIPE_SECRET, STRIPE_WEBHOOK_SECRET
+- APP_KEY freshly generated via `php artisan key:generate --show` (not reusing local dev key)
+- DB_PASSWORD set to the MySQL app user password from US-003
+- OPENAI_API_KEY, STRIPE_KEY, STRIPE_SECRET copied from owner's local .env
+- STRIPE_WEBHOOK_SECRET set to `whsec_placeholder` as specified
+- Created IAM role `lordoftongs-ec2-role` with inline policy `lordoftongs-ssm-read` allowing `ssm:GetParameter` on `arn:aws:ssm:us-east-1:539503476624:parameter/lordoftongs/prod/*`
+- Created instance profile `lordoftongs-ec2-profile` and attached role
+- Associated instance profile with EC2 instance `i-02155d7de13125a95`
+- Verified all parameters retrievable via `aws ssm get-parameter --with-decryption`
+- No code changes — this was all AWS CLI infrastructure work
+- **Learnings for future iterations:**
+  - IAM instance profile association takes a few seconds; need to wait after `add-role-to-instance-profile` before `associate-iam-instance-profile`
+  - SSM `put-parameter --type SecureString` uses default AWS-managed KMS key (aws/ssm) — no custom KMS key needed
+  - IAM role: `lordoftongs-ec2-role`, Instance profile: `lordoftongs-ec2-profile`, Association ID: `iip-assoc-052ec442a76d58991`
+  - To retrieve on EC2: `aws ssm get-parameter --name "/lordoftongs/prod/APP_KEY" --with-decryption --query 'Parameter.Value' --output text --region us-east-1`
 ---
