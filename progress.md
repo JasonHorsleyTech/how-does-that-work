@@ -13,6 +13,9 @@
 - Audio level detection: `calculateAudioLevel(Uint8Array)` returns RMS 0–1; `isSpeechDetected(level, threshold=0.01)` returns boolean; both in `resources/js/utils/audioLevel.ts`
 - Model factories go in `database/factories/`; use `Model::factory()` pattern
 - **AWS Deployment**: EC2 instance `i-02155d7de13125a95` (t3.small, Ubuntu 24.04) in us-east-1, Elastic IP `18.213.144.0`, SG `sg-0341e49f27cf3d05f`, SSH key `~/.ssh/lordoftongs-prod.pem`, SSH: `ssh -i ~/.ssh/lordoftongs-prod.pem ubuntu@18.213.144.0`
+- **Server Stack**: nginx 1.24, PHP 8.4 (Ondrej PPA) + FPM, MySQL 8.0, Composer 2.9, Node.js 20 (NodeSource), Certbot 2.9
+- **MySQL Prod User**: `lordoftongs@localhost`, password `lgTZpHUieZT4EiVRK51ofTp6O6Ho68CL`, database `how_does_that_work`
+- **PHP PPA**: `ppa:ondrej/php` added for PHP 8.4 on Ubuntu 24.04 (not in default repos)
 
 ---
 
@@ -479,4 +482,24 @@
   - Default VPC in us-east-1: `vpc-8dff35f0`
   - Old hdtw-ec2-key was deleted and replaced with lordoftongs-prod key
   - SSH to instance: `ssh -i ~/.ssh/lordoftongs-prod.pem ubuntu@18.213.144.0`
+---
+
+## 2026-02-25 - Deploy US-003
+- Installed all server dependencies on EC2 instance `i-02155d7de13125a95` (18.213.144.0)
+- **nginx** 1.24.0 installed and running (systemd enabled)
+- **PHP 8.4.18** installed via `ppa:ondrej/php` PPA with all required extensions: cli, fpm, mysql, mbstring, xml, curl, zip, bcmath, gd, intl, readline, tokenizer (+ opcache, pdo_mysql)
+- **php8.4-fpm** active and enabled (Unix socket at `/run/php/php-fpm.sock`)
+- **MySQL 8.0.45** installed and running; created database `how_does_that_work` (utf8mb4_unicode_ci); created app user `lordoftongs@localhost` with strong generated password; granted ALL PRIVILEGES on the database
+- **Composer 2.9.5** installed globally at `/usr/local/bin/composer`
+- **Node.js 20.20.0** + npm 10.8.2 installed via NodeSource
+- **Certbot 2.9.0** installed with `python3-certbot-nginx` plugin; auto-renewal timer active
+- **Git 2.43.0** already present (Ubuntu default)
+- **unzip 6.0** installed
+- No code changes — this was all server provisioning via SSH
+- **Learnings for future iterations:**
+  - PHP 8.4 requires `ppa:ondrej/php` on Ubuntu 24.04 (not in default repos)
+  - `php8.4-tokenizer` package doesn't exist separately — tokenizer is built into php8.4-cli
+  - `DEBIAN_FRONTEND=noninteractive` is needed for `apt-get install mysql-server` to avoid interactive prompts over SSH
+  - MySQL on Ubuntu 24.04 uses `auth_socket` plugin for root by default — use `sudo mysql` (no password) to create the app user, then the app user uses `mysql_native_password`
+  - MySQL app user password: `lgTZpHUieZT4EiVRK51ofTp6O6Ho68CL` (will be stored in SSM in US-004)
 ---
