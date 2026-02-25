@@ -451,3 +451,14 @@
   - pint `no_unused_imports` will remove model imports if the model class is only referenced via string table names (e.g. `assertDatabaseHas('api_usage_logs', ...)` doesn't require `use App\Models\ApiUsageLog`)
   - All existing billing tests still pass because the zero-credits guard only skips the API call — credits stay at 0, which is what those tests assert
 ---
+
+## 2026-02-24 - Deploy US-001
+- Merged chief/how-does-that-work branch into main (fast-forward)
+- Remote origin/main was already up to date with all 52 commits
+- Local main fast-forwarded to match; branches are now identical
+- No files changed (this was a git branch operation, not code changes)
+- **Learnings for future iterations:**
+  - The remote main was already pushed at some point, so only the local ref needed updating
+  - `git merge --ff-only origin/main` is the safe way to catch up a local branch without creating merge commits
+  - The `.chief/` directory is gitignored, so PRD changes don't need to be committed
+---
