@@ -72,6 +72,7 @@ class GameController extends Controller
     {
         $game = Game::where('code', strtoupper($code))->firstOrFail();
 
+        $playerId = null;
         if ($request->user()) {
             $hasAccess = $game->players()->where('user_id', $request->user()->id)->exists();
         } else {
@@ -81,6 +82,11 @@ class GameController extends Controller
 
         if (! $hasAccess) {
             abort(403);
+        }
+
+        // Touch player updated_at to keep reconnect window alive
+        if ($playerId) {
+            Player::where('id', $playerId)->update(['updated_at' => now()]);
         }
 
         $players = $game->players()->get(['id', 'name', 'is_host']);
@@ -123,6 +129,7 @@ class GameController extends Controller
     {
         $game = Game::where('code', strtoupper($code))->firstOrFail();
 
+        $playerId = null;
         if ($request->user()) {
             $hasAccess = $game->players()->where('user_id', $request->user()->id)->exists();
         } else {
@@ -132,6 +139,11 @@ class GameController extends Controller
 
         if (! $hasAccess) {
             abort(403);
+        }
+
+        // Touch player updated_at to keep reconnect window alive
+        if ($playerId) {
+            Player::where('id', $playerId)->update(['updated_at' => now()]);
         }
 
         $players = $game->players()->get(['id', 'name', 'has_submitted']);

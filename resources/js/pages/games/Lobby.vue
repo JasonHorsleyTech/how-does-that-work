@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { Head, router, useForm } from '@inertiajs/vue3';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { Button } from '@/components/ui/button';
-import { type BreadcrumbItem } from '@/types';
-import { dashboard } from '@/routes';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import QRCode from 'qrcode';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { Button } from '@/components/ui/button';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { dashboard } from '@/routes';
+import { type BreadcrumbItem } from '@/types';
 
 const props = defineProps<{
     game: {
@@ -21,12 +21,17 @@ const props = defineProps<{
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: dashboard().url },
-    { title: `Lobby — ${props.game.code}`, href: `/games/${props.game.code}/lobby` },
+    {
+        title: `Lobby — ${props.game.code}`,
+        href: `/games/${props.game.code}/lobby`,
+    },
 ];
 
 const qrDataUrl = ref<string>('');
 const players = ref([...props.game.players]);
-const nonHostCount = computed(() => players.value.filter((p) => !p.is_host).length);
+const nonHostCount = computed(
+    () => players.value.filter((p) => !p.is_host).length,
+);
 const canStart = computed(() => nonHostCount.value >= 2);
 
 const startForm = useForm({});
@@ -38,6 +43,23 @@ function startSubmission() {
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 
 onMounted(async () => {
+    // Store reconnect data in localStorage if flashed from join
+    const page = usePage();
+    const reconnectData = (page.props.flash as Record<string, unknown>)
+        ?.reconnect_data as
+        | { reconnect_token: string; game_code: string; player_id: number }
+        | undefined;
+    if (reconnectData?.reconnect_token) {
+        try {
+            localStorage.setItem(
+                `hdtw_player_${reconnectData.game_code}`,
+                JSON.stringify(reconnectData),
+            );
+        } catch {
+            // localStorage unavailable
+        }
+    }
+
     if (props.isHost) {
         qrDataUrl.value = await QRCode.toDataURL(props.joinUrl, {
             width: 200,
@@ -57,7 +79,10 @@ onUnmounted(() => {
 async function pollPlayers() {
     try {
         const response = await fetch(`/games/${props.game.code}/players`, {
-            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
         });
         if (response.ok) {
             const data = await response.json();
@@ -82,16 +107,22 @@ async function pollPlayers() {
         <div class="flex flex-1 flex-col items-center p-6">
             <div class="w-full max-w-lg space-y-8">
                 <div class="text-center">
-                    <h1 class="text-3xl font-bold tracking-tight">Game Lobby</h1>
+                    <h1 class="text-3xl font-bold tracking-tight">
+                        Game Lobby
+                    </h1>
                     <p class="mt-1 text-muted-foreground">
                         Share the code or link below so players can join.
                     </p>
                 </div>
 
                 <!-- Game code + QR -->
-                <div class="flex flex-col items-center gap-6 rounded-xl border p-6">
+                <div
+                    class="flex flex-col items-center gap-6 rounded-xl border p-6"
+                >
                     <div class="text-center">
-                        <p class="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                        <p
+                            class="text-sm font-medium tracking-wider text-muted-foreground uppercase"
+                        >
                             Game Code
                         </p>
                         <p class="mt-1 text-5xl font-bold tracking-widest">
@@ -100,7 +131,11 @@ async function pollPlayers() {
                     </div>
 
                     <div class="text-center">
-                        <p class="mb-3 text-sm font-medium text-muted-foreground">Or scan to join:</p>
+                        <p
+                            class="mb-3 text-sm font-medium text-muted-foreground"
+                        >
+                            Or scan to join:
+                        </p>
                         <img
                             v-if="qrDataUrl"
                             :src="qrDataUrl"
@@ -112,8 +147,14 @@ async function pollPlayers() {
                     </div>
 
                     <div class="w-full">
-                        <p class="mb-1 text-sm font-medium text-muted-foreground">Shareable link:</p>
-                        <code class="block break-all rounded bg-muted px-3 py-2 text-sm">
+                        <p
+                            class="mb-1 text-sm font-medium text-muted-foreground"
+                        >
+                            Shareable link:
+                        </p>
+                        <code
+                            class="block rounded bg-muted px-3 py-2 text-sm break-all"
+                        >
                             {{ joinUrl }}
                         </code>
                     </div>
@@ -121,16 +162,24 @@ async function pollPlayers() {
 
                 <!-- Players list -->
                 <div>
-                    <h2 class="mb-3 text-lg font-semibold">Players ({{ players.length }})</h2>
+                    <h2 class="mb-3 text-lg font-semibold">
+                        Players ({{ players.length }})
+                    </h2>
                     <ul class="space-y-2">
                         <li
                             v-for="player in players"
                             :key="player.id"
                             class="flex items-center gap-3 rounded-lg border px-4 py-3"
                         >
-                            <span class="h-2 w-2 rounded-full bg-green-500" aria-hidden="true" />
+                            <span
+                                class="h-2 w-2 rounded-full bg-green-500"
+                                aria-hidden="true"
+                            />
                             <span class="font-medium">{{ player.name }}</span>
-                            <span v-if="player.is_host" class="ml-auto text-xs text-muted-foreground">
+                            <span
+                                v-if="player.is_host"
+                                class="ml-auto text-xs text-muted-foreground"
+                            >
                                 Host
                             </span>
                         </li>
@@ -144,9 +193,16 @@ async function pollPlayers() {
                         :disabled="!canStart || startForm.processing"
                         @click="startSubmission"
                     >
-                        {{ startForm.processing ? 'Starting…' : 'Start Submission Phase' }}
+                        {{
+                            startForm.processing
+                                ? 'Starting…'
+                                : 'Start Submission Phase'
+                        }}
                     </Button>
-                    <p v-if="!canStart" class="mt-2 text-center text-sm text-muted-foreground">
+                    <p
+                        v-if="!canStart"
+                        class="mt-2 text-center text-sm text-muted-foreground"
+                    >
                         Waiting for at least 2 players to join…
                     </p>
                 </div>
@@ -155,7 +211,10 @@ async function pollPlayers() {
     </AppLayout>
 
     <!-- Guest view: simple page layout -->
-    <div v-else class="flex min-h-screen flex-col items-center justify-center bg-background p-6">
+    <div
+        v-else
+        class="flex min-h-screen flex-col items-center justify-center bg-background p-6"
+    >
         <div class="w-full max-w-md space-y-8">
             <div class="text-center">
                 <h1 class="text-3xl font-bold tracking-tight">Game Lobby</h1>
@@ -166,16 +225,24 @@ async function pollPlayers() {
 
             <!-- Players list -->
             <div class="rounded-xl border p-6">
-                <h2 class="mb-3 text-lg font-semibold">Players ({{ players.length }})</h2>
+                <h2 class="mb-3 text-lg font-semibold">
+                    Players ({{ players.length }})
+                </h2>
                 <ul class="space-y-2">
                     <li
                         v-for="player in players"
                         :key="player.id"
                         class="flex items-center gap-3 rounded-lg border px-4 py-3"
                     >
-                        <span class="h-2 w-2 rounded-full bg-green-500" aria-hidden="true" />
+                        <span
+                            class="h-2 w-2 rounded-full bg-green-500"
+                            aria-hidden="true"
+                        />
                         <span class="font-medium">{{ player.name }}</span>
-                        <span v-if="player.is_host" class="ml-auto text-xs text-muted-foreground">
+                        <span
+                            v-if="player.is_host"
+                            class="ml-auto text-xs text-muted-foreground"
+                        >
                             Host
                         </span>
                     </li>

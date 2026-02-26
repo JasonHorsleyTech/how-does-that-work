@@ -31,7 +31,7 @@ class RedirectToGameState
             return $next($request);
         }
 
-        $correctUrl = $this->correctUrlForStatus($game);
+        $correctUrl = static::correctUrlForStatus($game);
         if (! $correctUrl) {
             return $next($request);
         }
@@ -60,21 +60,21 @@ class RedirectToGameState
         return $playerId && $game->players()->where('id', $playerId)->exists();
     }
 
-    private function correctUrlForStatus(Game $game): ?string
+    public static function correctUrlForStatus(Game $game): ?string
     {
         return match ($game->status) {
             'lobby' => "/games/{$game->code}/lobby",
             'submitting' => "/games/{$game->code}/submit",
             'playing' => "/games/{$game->code}/play",
             'grading' => "/games/{$game->code}/play",
-            'grading_complete' => $this->gradingCompleteUrl($game),
+            'grading_complete' => static::gradingCompleteUrl($game),
             'round_complete' => "/games/{$game->code}/round-complete",
             'complete' => "/games/{$game->code}/complete",
             default => null,
         };
     }
 
-    private function gradingCompleteUrl(Game $game): string
+    private static function gradingCompleteUrl(Game $game): string
     {
         $completedTurn = $game->turns()
             ->where('status', 'complete')

@@ -62,5 +62,6 @@ Route::post('games/{code}/play-again', [TurnController::class, 'playAgain'])->na
 
 Route::get('join/{code}', [JoinController::class, 'show'])->name('games.join.show');
 Route::post('join/{code}', [JoinController::class, 'store'])->name('games.join.store');
+Route::post('join/{code}/reconnect', [JoinController::class, 'reconnect'])->name('games.join.reconnect');
 
 require __DIR__.'/settings.php';
