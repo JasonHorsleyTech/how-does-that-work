@@ -41,8 +41,8 @@ class RedirectToGameState
             return $next($request);
         }
 
-        // Also allow results pages during grading_complete (the URL contains a turnId)
-        if ($game->status === 'grading_complete' && $request->is("games/{$game->code}/results/*")) {
+        // Allow results pages during grading_complete or complete (viewing individual turn results)
+        if (in_array($game->status, ['grading_complete', 'complete']) && $request->is("games/{$game->code}/results/*")) {
             return $next($request);
         }
 
