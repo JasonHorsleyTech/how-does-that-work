@@ -68,7 +68,7 @@
         "Write at least one feature test: player joins, loses session, hits reconnect endpoint with valid token, session is restored"
       ],
       "priority": 2,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-005",

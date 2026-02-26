@@ -14,6 +14,9 @@
 - Polling in all game pages uses raw `setInterval` (no composable) with 3-second intervals
 - Game page routes (GET Inertia pages) are wrapped in `RedirectToGameState` middleware; polling/API/POST routes are NOT
 - Game status → correct URL mapping is in `RedirectToGameState::correctUrlForStatus()` — use this as the source of truth for redirect rules
+- `RedirectToGameState::correctUrlForStatus()` is `public static` — reusable from any controller/endpoint
+- To pass data from a POST redirect to the destination page, use Laravel session flash + Inertia shared props via `HandleInertiaRequests::share()` — access it as `usePage().props.flash.key`
+- CSRF token for fetch() requests: read from `XSRF-TOKEN` cookie, decode with `decodeURIComponent`, send in `X-XSRF-TOKEN` header
 ---
 
 ## 2026-02-26 - US-001
@@ -56,4 +59,24 @@
   - `grading_complete` requires querying the latest completed turn to build the results URL
   - Existing tests that checked controller-level redirects (e.g., `TopicSubmissionTest`, `GameCompleteTest`) continue to pass because the middleware performs the same redirects
   - DevController has a bug: `joinGame()` uses unscoped `'player_id'` session key instead of `"player_id.{$code}"` — may need fixing in future stories
+---
+
+## 2026-02-26 - US-004
+- What was implemented: Player reconnection via localStorage token — guest players can rejoin games after losing their session by revisiting the join URL
+- Files changed:
+  - `app/Http/Controllers/JoinController.php` — added `reconnect()` endpoint + flash reconnect data in `store()`
+  - `app/Http/Middleware/RedirectToGameState.php` — made `correctUrlForStatus()` public static for reuse
+  - `app/Http/Middleware/HandleInertiaRequests.php` — share flash `reconnect_data` via Inertia shared props
+  - `resources/js/pages/games/Join.vue` — check localStorage on mount, attempt reconnect via API, show "Reconnecting…" state
+  - `resources/js/pages/games/Lobby.vue` — store reconnect data from flash into localStorage on mount
+  - `app/Http/Controllers/GameController.php` — touch `updated_at` on guest player in `players()` and `submissionStatus()` polling endpoints
+  - `app/Http/Controllers/TurnController.php` — touch `updated_at` on player in `playState()`, `chooseTopic()`, `startRecording()`, `storeAudio()`
+  - `routes/web.php` — added `POST /join/{code}/reconnect` route
+  - `tests/Feature/ReconnectTest.php` (new) — 8 tests covering full reconnect flow
+- **Learnings for future iterations:**
+  - To pass data across an Inertia redirect (POST → redirect → new page), use Laravel session flash (`->with()`) combined with Inertia shared props in `HandleInertiaRequests::share()`
+  - The reconnect endpoint validates `reconnect_token` against the `players` table, filtered to `user_id IS NULL` (guests only) and `updated_at` within 10 minutes
+  - The `X-XSRF-TOKEN` header must be decoded from the cookie via `decodeURIComponent` — Laravel encodes the CSRF token in the cookie
+  - `$player->touch()` is an efficient way to update `updated_at` without changing other fields
+  - The `flushSession()` method in tests clears session data — useful for simulating session loss in reconnect tests
 ---
