@@ -106,3 +106,17 @@
   - Both non-200 responses and network errors (catch) should update `lastPollAt` alongside `pollError` to ensure the indicator reflects the latest state
   - The component is placed outside the `v-if`/`v-else` layout blocks (host vs guest) so it renders once regardless of which view is active
 ---
+
+## 2026-02-26 - US-007
+- What was implemented: Collapsible QR code and join link panel on host Submit and Play screens, allowing hosts to re-share the join info with players who dropped
+- Files changed:
+  - `resources/js/components/JoinLinkPanel.vue` (new) — reusable collapsible panel with QR code, game code, and shareable link
+  - `resources/js/pages/games/Submit.vue` — import and render JoinLinkPanel in host view
+  - `resources/js/pages/games/Play.vue` — import and render JoinLinkPanel in host view
+- **Learnings for future iterations:**
+  - The project already has a `Collapsible`/`CollapsibleTrigger`/`CollapsibleContent` UI component set (from reka-ui) — use these for any toggle/disclosure patterns
+  - The `joinUrl` can be constructed client-side as `window.location.origin + '/join/' + gameCode` — no need to pass it as a prop from the server for secondary screens
+  - QR code generation uses the `qrcode` npm package with `QRCode.toDataURL()` — async, must be called in `onMounted`
+  - Host views in game pages use `AppLayout` wrapper with a `v-if="player.is_host"` / `v-else` pattern — host-only UI goes inside the AppLayout block
+  - The JoinLinkPanel is placed after the main content area but inside the AppLayout block, so it appears at the bottom of the host's view
+---
