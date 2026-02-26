@@ -13,19 +13,10 @@ class DevController extends Controller
 {
     public function index()
     {
-        $users = User::whereIn('email', [
-            'host-loaded@dev.test',
-            'host-standard@dev.test',
-            'host-broke@dev.test',
-            'host-veteran@dev.test',
-        ])->get();
+        $users = User::where('email', 'like', 'host-%@dev.test')->get();
 
         $games = Game::with(['host', 'players'])
-            ->whereHas('host', fn ($q) => $q->whereIn('email', [
-                'host-loaded@dev.test',
-                'host-standard@dev.test',
-                'host-veteran@dev.test',
-            ]))
+            ->whereHas('host', fn ($q) => $q->where('email', 'like', 'host-%@dev.test'))
             ->orderBy('status')
             ->get();
 

@@ -36,6 +36,28 @@ class DevSeeder extends Seeder
             ['name' => 'Host Veteran', 'password' => Hash::make('password'), 'email_verified_at' => now(), 'credits' => 150]
         );
 
+        // Scenario hosts for E2E testing
+        $hostSubmitting = User::updateOrCreate(
+            ['email' => 'host-submitting@dev.test'],
+            ['name' => 'Host Submitting', 'password' => Hash::make('password'), 'email_verified_at' => now(), 'credits' => 100]
+        );
+        $hostReady = User::updateOrCreate(
+            ['email' => 'host-ready@dev.test'],
+            ['name' => 'Host Ready', 'password' => Hash::make('password'), 'email_verified_at' => now(), 'credits' => 100]
+        );
+        $hostChoosing = User::updateOrCreate(
+            ['email' => 'host-choosing@dev.test'],
+            ['name' => 'Host Choosing', 'password' => Hash::make('password'), 'email_verified_at' => now(), 'credits' => 100]
+        );
+        $hostGradingDone = User::updateOrCreate(
+            ['email' => 'host-grading-done@dev.test'],
+            ['name' => 'Host Grading Done', 'password' => Hash::make('password'), 'email_verified_at' => now(), 'credits' => 100]
+        );
+        $hostRoundDone = User::updateOrCreate(
+            ['email' => 'host-round-done@dev.test'],
+            ['name' => 'Host Round Done', 'password' => Hash::make('password'), 'email_verified_at' => now(), 'credits' => 100]
+        );
+
         $this->command->info('');
         $this->command->info('Seeded accounts:');
         $this->command->table(
@@ -45,6 +67,11 @@ class DevSeeder extends Seeder
                 [$hostStandard->email, 'password', $hostStandard->credits, url("/dev/login-as/{$hostStandard->id}")],
                 [$hostBroke->email, 'password', $hostBroke->credits, url("/dev/login-as/{$hostBroke->id}")],
                 [$hostVeteran->email, 'password', $hostVeteran->credits, url("/dev/login-as/{$hostVeteran->id}")],
+                [$hostSubmitting->email, 'password', $hostSubmitting->credits, url("/dev/login-as/{$hostSubmitting->id}")],
+                [$hostReady->email, 'password', $hostReady->credits, url("/dev/login-as/{$hostReady->id}")],
+                [$hostChoosing->email, 'password', $hostChoosing->credits, url("/dev/login-as/{$hostChoosing->id}")],
+                [$hostGradingDone->email, 'password', $hostGradingDone->credits, url("/dev/login-as/{$hostGradingDone->id}")],
+                [$hostRoundDone->email, 'password', $hostRoundDone->credits, url("/dev/login-as/{$hostRoundDone->id}")],
             ]
         );
 
@@ -273,13 +300,314 @@ class DevSeeder extends Seeder
             'completed_at' => now()->subHours(2)->subMinutes(26),
         ]);
 
+        // --- Scenario 1: Submitting phase — host has NOT submitted yet ---
+        // Log in as host-submitting@dev.test → should see topic submission form at /games/{code}/submit
+        $submittingCode = $this->uniqueCode();
+        $submittingGame = Game::create([
+            'host_user_id' => $hostSubmitting->id,
+            'code' => $submittingCode,
+            'status' => 'submitting',
+            'current_round' => 1,
+            'max_rounds' => 1,
+            'state_updated_at' => now(),
+        ]);
+        Player::create([
+            'game_id' => $submittingGame->id,
+            'user_id' => $hostSubmitting->id,
+            'name' => $hostSubmitting->name,
+            'is_host' => true,
+            'has_submitted' => false,
+            'score' => 0,
+        ]);
+        Player::create([
+            'game_id' => $submittingGame->id,
+            'user_id' => null,
+            'name' => 'Witty Otter',
+            'is_host' => false,
+            'has_submitted' => false,
+            'score' => 0,
+        ]);
+        Player::create([
+            'game_id' => $submittingGame->id,
+            'user_id' => null,
+            'name' => 'Fierce Lynx',
+            'is_host' => false,
+            'has_submitted' => false,
+            'score' => 0,
+        ]);
+
+        // --- Scenario 2: Submitting phase — all submitted, host ready to start ---
+        // Log in as host-ready@dev.test → should see "Start Game" button at /games/{code}/submit
+        $readyCode = $this->uniqueCode();
+        $readyGame = Game::create([
+            'host_user_id' => $hostReady->id,
+            'code' => $readyCode,
+            'status' => 'submitting',
+            'current_round' => 1,
+            'max_rounds' => 1,
+            'state_updated_at' => now(),
+        ]);
+        $readyHost = Player::create([
+            'game_id' => $readyGame->id,
+            'user_id' => $hostReady->id,
+            'name' => $hostReady->name,
+            'is_host' => true,
+            'has_submitted' => true,
+            'score' => 0,
+        ]);
+        $readyGuest1 = Player::create([
+            'game_id' => $readyGame->id,
+            'user_id' => null,
+            'name' => 'Brave Badger',
+            'is_host' => false,
+            'has_submitted' => true,
+            'score' => 0,
+        ]);
+        $readyGuest2 = Player::create([
+            'game_id' => $readyGame->id,
+            'user_id' => null,
+            'name' => 'Calm Raven',
+            'is_host' => false,
+            'has_submitted' => true,
+            'score' => 0,
+        ]);
+        // All players have submitted 3 topics each
+        Topic::create(['game_id' => $readyGame->id, 'submitted_by_player_id' => $readyHost->id, 'text' => 'How does a dishwasher clean dishes?', 'is_used' => false]);
+        Topic::create(['game_id' => $readyGame->id, 'submitted_by_player_id' => $readyHost->id, 'text' => 'How does a smoke detector sense fire?', 'is_used' => false]);
+        Topic::create(['game_id' => $readyGame->id, 'submitted_by_player_id' => $readyHost->id, 'text' => 'How does a zipper work?', 'is_used' => false]);
+        Topic::create(['game_id' => $readyGame->id, 'submitted_by_player_id' => $readyGuest1->id, 'text' => 'How does a suspension bridge support weight?', 'is_used' => false]);
+        Topic::create(['game_id' => $readyGame->id, 'submitted_by_player_id' => $readyGuest1->id, 'text' => 'How does a thermos keep liquids hot or cold?', 'is_used' => false]);
+        Topic::create(['game_id' => $readyGame->id, 'submitted_by_player_id' => $readyGuest1->id, 'text' => 'How does a ballpoint pen work?', 'is_used' => false]);
+        Topic::create(['game_id' => $readyGame->id, 'submitted_by_player_id' => $readyGuest2->id, 'text' => 'How does a bicycle stay balanced?', 'is_used' => false]);
+        Topic::create(['game_id' => $readyGame->id, 'submitted_by_player_id' => $readyGuest2->id, 'text' => 'How does a fire extinguisher put out flames?', 'is_used' => false]);
+        Topic::create(['game_id' => $readyGame->id, 'submitted_by_player_id' => $readyGuest2->id, 'text' => 'How does a laser pointer produce light?', 'is_used' => false]);
+
+        // --- Scenario 3: Playing phase — active player is choosing a topic ---
+        // Log in as host-choosing@dev.test → should see play screen at /games/{code}/play with active player choosing
+        $choosingCode = $this->uniqueCode();
+        $choosingGame = Game::create([
+            'host_user_id' => $hostChoosing->id,
+            'code' => $choosingCode,
+            'status' => 'playing',
+            'current_round' => 1,
+            'max_rounds' => 1,
+            'state_updated_at' => now(),
+        ]);
+        $choosingHost = Player::create([
+            'game_id' => $choosingGame->id,
+            'user_id' => $hostChoosing->id,
+            'name' => $hostChoosing->name,
+            'is_host' => true,
+            'has_submitted' => true,
+            'score' => 0,
+        ]);
+        $choosingGuest1 = Player::create([
+            'game_id' => $choosingGame->id,
+            'user_id' => null,
+            'name' => 'Jolly Panda',
+            'is_host' => false,
+            'has_submitted' => true,
+            'score' => 0,
+        ]);
+        $choosingGuest2 = Player::create([
+            'game_id' => $choosingGame->id,
+            'user_id' => null,
+            'name' => 'Rapid Lynx',
+            'is_host' => false,
+            'has_submitted' => true,
+            'score' => 0,
+        ]);
+        // Topics for choosing game
+        $chTopic1 = Topic::create(['game_id' => $choosingGame->id, 'submitted_by_player_id' => $choosingHost->id, 'text' => 'How does a helicopter hover?', 'is_used' => false]);
+        $chTopic2 = Topic::create(['game_id' => $choosingGame->id, 'submitted_by_player_id' => $choosingHost->id, 'text' => 'How does a 3D printer build objects?', 'is_used' => false]);
+        Topic::create(['game_id' => $choosingGame->id, 'submitted_by_player_id' => $choosingHost->id, 'text' => 'How does a wind turbine generate electricity?', 'is_used' => false]);
+        Topic::create(['game_id' => $choosingGame->id, 'submitted_by_player_id' => $choosingGuest1->id, 'text' => 'How does noise-cancelling work in headphones?', 'is_used' => false]);
+        Topic::create(['game_id' => $choosingGame->id, 'submitted_by_player_id' => $choosingGuest1->id, 'text' => 'How does an escalator move stairs?', 'is_used' => false]);
+        Topic::create(['game_id' => $choosingGame->id, 'submitted_by_player_id' => $choosingGuest1->id, 'text' => 'How does a submarine dive and surface?', 'is_used' => false]);
+        Topic::create(['game_id' => $choosingGame->id, 'submitted_by_player_id' => $choosingGuest2->id, 'text' => 'How does a solar panel convert sunlight to electricity?', 'is_used' => false]);
+        Topic::create(['game_id' => $choosingGame->id, 'submitted_by_player_id' => $choosingGuest2->id, 'text' => 'How does a barcode scanner read prices?', 'is_used' => false]);
+        Topic::create(['game_id' => $choosingGame->id, 'submitted_by_player_id' => $choosingGuest2->id, 'text' => 'How does a remote control send signals to a TV?', 'is_used' => false]);
+        // First turn: choosing (active player sees topic selection buttons)
+        Turn::create([
+            'game_id' => $choosingGame->id,
+            'player_id' => $choosingGuest1->id,
+            'topic_id' => null,
+            'topic_choices' => [$chTopic1->id, $chTopic2->id],
+            'round_number' => 1,
+            'turn_order' => 1,
+            'status' => 'choosing',
+            'started_at' => now()->subMinutes(1),
+        ]);
+        Turn::create([
+            'game_id' => $choosingGame->id,
+            'player_id' => $choosingGuest2->id,
+            'topic_id' => null,
+            'topic_choices' => [],
+            'round_number' => 1,
+            'turn_order' => 2,
+            'status' => 'pending',
+        ]);
+
+        // --- Scenario 4: Grading complete — host can advance to next turn ---
+        // Log in as host-grading-done@dev.test → should see results screen at /games/{code}/results/{turnId}
+        $gradingDoneCode = $this->uniqueCode();
+        $gradingDoneGame = Game::create([
+            'host_user_id' => $hostGradingDone->id,
+            'code' => $gradingDoneCode,
+            'status' => 'grading_complete',
+            'current_round' => 1,
+            'max_rounds' => 1,
+            'state_updated_at' => now(),
+        ]);
+        $gdHost = Player::create([
+            'game_id' => $gradingDoneGame->id,
+            'user_id' => $hostGradingDone->id,
+            'name' => $hostGradingDone->name,
+            'is_host' => true,
+            'has_submitted' => true,
+            'score' => 0,
+        ]);
+        $gdGuest1 = Player::create([
+            'game_id' => $gradingDoneGame->id,
+            'user_id' => null,
+            'name' => 'Bold Otter',
+            'is_host' => false,
+            'has_submitted' => true,
+            'score' => 82,
+        ]);
+        $gdGuest2 = Player::create([
+            'game_id' => $gradingDoneGame->id,
+            'user_id' => null,
+            'name' => 'Gentle Fox',
+            'is_host' => false,
+            'has_submitted' => true,
+            'score' => 0,
+        ]);
+        // Topics
+        $gdTopic1 = Topic::create(['game_id' => $gradingDoneGame->id, 'submitted_by_player_id' => $gdHost->id, 'text' => 'How does a parachute slow your fall?', 'is_used' => true]);
+        Topic::create(['game_id' => $gradingDoneGame->id, 'submitted_by_player_id' => $gdHost->id, 'text' => 'How does a magnifying glass start a fire?', 'is_used' => false]);
+        Topic::create(['game_id' => $gradingDoneGame->id, 'submitted_by_player_id' => $gdHost->id, 'text' => 'How does a water filter purify water?', 'is_used' => false]);
+        Topic::create(['game_id' => $gradingDoneGame->id, 'submitted_by_player_id' => $gdGuest1->id, 'text' => 'How does an MRI scan your body?', 'is_used' => false]);
+        Topic::create(['game_id' => $gradingDoneGame->id, 'submitted_by_player_id' => $gdGuest1->id, 'text' => 'How does a catalytic converter reduce emissions?', 'is_used' => false]);
+        Topic::create(['game_id' => $gradingDoneGame->id, 'submitted_by_player_id' => $gdGuest1->id, 'text' => 'How does a defibrillator restart a heart?', 'is_used' => false]);
+        Topic::create(['game_id' => $gradingDoneGame->id, 'submitted_by_player_id' => $gdGuest2->id, 'text' => 'How does a pressure cooker cook faster?', 'is_used' => false]);
+        Topic::create(['game_id' => $gradingDoneGame->id, 'submitted_by_player_id' => $gdGuest2->id, 'text' => 'How does a seatbelt save lives in a crash?', 'is_used' => false]);
+        Topic::create(['game_id' => $gradingDoneGame->id, 'submitted_by_player_id' => $gdGuest2->id, 'text' => 'How does a thermostat know the temperature?', 'is_used' => false]);
+        // First turn: complete (just graded), second turn: pending
+        $gdCompletedTurn = Turn::create([
+            'game_id' => $gradingDoneGame->id,
+            'player_id' => $gdGuest1->id,
+            'topic_id' => $gdTopic1->id,
+            'round_number' => 1,
+            'turn_order' => 1,
+            'status' => 'complete',
+            'transcript' => 'A parachute works by creating air resistance. The large fabric canopy catches air as you fall, which creates drag that opposes the force of gravity, slowing you down to a safe landing speed.',
+            'score' => 82,
+            'grade' => 'B',
+            'feedback' => 'Good grasp of the basic physics. You correctly identified drag as the key mechanism. To improve, mention how the shape of the canopy creates a pocket of high-pressure air beneath it.',
+            'actual_explanation' => 'A parachute slows descent through aerodynamic drag. When deployed, the large canopy fills with air, creating a high-pressure zone underneath. This air resistance (drag force) opposes gravity. The drag force increases with surface area and speed, so the large canopy creates enough drag to reduce terminal velocity from ~200 km/h to ~20 km/h, allowing a safe landing.',
+            'started_at' => now()->subMinutes(8),
+            'completed_at' => now()->subMinutes(3),
+        ]);
+        Turn::create([
+            'game_id' => $gradingDoneGame->id,
+            'player_id' => $gdGuest2->id,
+            'topic_id' => null,
+            'topic_choices' => [],
+            'round_number' => 1,
+            'turn_order' => 2,
+            'status' => 'pending',
+        ]);
+
+        // --- Scenario 5: Round complete — host can start next round ---
+        // Log in as host-round-done@dev.test → should see round complete screen at /games/{code}/round-complete
+        $roundDoneCode = $this->uniqueCode();
+        $roundDoneGame = Game::create([
+            'host_user_id' => $hostRoundDone->id,
+            'code' => $roundDoneCode,
+            'status' => 'round_complete',
+            'current_round' => 1,
+            'max_rounds' => 2,
+            'state_updated_at' => now(),
+        ]);
+        $rdHost = Player::create([
+            'game_id' => $roundDoneGame->id,
+            'user_id' => $hostRoundDone->id,
+            'name' => $hostRoundDone->name,
+            'is_host' => true,
+            'has_submitted' => true,
+            'score' => 0,
+        ]);
+        $rdGuest1 = Player::create([
+            'game_id' => $roundDoneGame->id,
+            'user_id' => null,
+            'name' => 'Sneaky Raven',
+            'is_host' => false,
+            'has_submitted' => true,
+            'score' => 70,
+        ]);
+        $rdGuest2 = Player::create([
+            'game_id' => $roundDoneGame->id,
+            'user_id' => null,
+            'name' => 'Calm Panda',
+            'is_host' => false,
+            'has_submitted' => true,
+            'score' => 90,
+        ]);
+        // Topics
+        $rdTopic1 = Topic::create(['game_id' => $roundDoneGame->id, 'submitted_by_player_id' => $rdHost->id, 'text' => 'How does a microphone convert sound to electricity?', 'is_used' => true]);
+        $rdTopic2 = Topic::create(['game_id' => $roundDoneGame->id, 'submitted_by_player_id' => $rdHost->id, 'text' => 'How does a vacuum cleaner create suction?', 'is_used' => true]);
+        Topic::create(['game_id' => $roundDoneGame->id, 'submitted_by_player_id' => $rdHost->id, 'text' => 'How does a light bulb produce light?', 'is_used' => false]);
+        Topic::create(['game_id' => $roundDoneGame->id, 'submitted_by_player_id' => $rdGuest1->id, 'text' => 'How does an elevator know which floor to stop at?', 'is_used' => false]);
+        Topic::create(['game_id' => $roundDoneGame->id, 'submitted_by_player_id' => $rdGuest1->id, 'text' => 'How does a blender crush ice?', 'is_used' => false]);
+        Topic::create(['game_id' => $roundDoneGame->id, 'submitted_by_player_id' => $rdGuest1->id, 'text' => 'How does a traffic light change colors?', 'is_used' => false]);
+        Topic::create(['game_id' => $roundDoneGame->id, 'submitted_by_player_id' => $rdGuest2->id, 'text' => 'How does a washing machine remove stains?', 'is_used' => false]);
+        Topic::create(['game_id' => $roundDoneGame->id, 'submitted_by_player_id' => $rdGuest2->id, 'text' => 'How does a metal detector find buried objects?', 'is_used' => false]);
+        Topic::create(['game_id' => $roundDoneGame->id, 'submitted_by_player_id' => $rdGuest2->id, 'text' => 'How does a water heater heat water?', 'is_used' => false]);
+        // All turns in round 1 are complete
+        Turn::create([
+            'game_id' => $roundDoneGame->id,
+            'player_id' => $rdGuest1->id,
+            'topic_id' => $rdTopic1->id,
+            'round_number' => 1,
+            'turn_order' => 1,
+            'status' => 'complete',
+            'transcript' => 'A microphone has a thin diaphragm that vibrates when sound waves hit it. These vibrations move a coil near a magnet, which generates a small electrical current that matches the sound pattern.',
+            'score' => 70,
+            'grade' => 'C',
+            'feedback' => 'You described the dynamic microphone type well but missed that there are different types (condenser, ribbon). The basic electromagnetic induction principle was correct.',
+            'actual_explanation' => 'A microphone converts sound into electricity. In a dynamic mic, sound waves vibrate a diaphragm attached to a coil in a magnetic field, inducing an electrical signal via electromagnetic induction. In a condenser mic, sound vibrates one plate of a capacitor, changing the capacitance and producing a signal. The electrical output mirrors the original sound wave pattern.',
+            'started_at' => now()->subMinutes(20),
+            'completed_at' => now()->subMinutes(15),
+        ]);
+        Turn::create([
+            'game_id' => $roundDoneGame->id,
+            'player_id' => $rdGuest2->id,
+            'topic_id' => $rdTopic2->id,
+            'round_number' => 1,
+            'turn_order' => 2,
+            'status' => 'complete',
+            'transcript' => 'A vacuum cleaner uses a motor to spin a fan that pushes air out of the machine. This creates a low-pressure area inside that sucks air and dirt in through the hose.',
+            'score' => 90,
+            'grade' => 'A',
+            'feedback' => 'Excellent explanation of the pressure differential mechanism. Clear and accurate description of how the motor, fan, and pressure difference work together.',
+            'actual_explanation' => 'A vacuum cleaner creates suction through pressure differential. An electric motor spins a fan (impeller) that pushes air out of the machine, creating a partial vacuum (low-pressure zone) inside. Atmospheric pressure outside is higher, so air rushes in through the intake, carrying dust and debris with it. The dirty air passes through filters that trap particles while clean air exits.',
+            'started_at' => now()->subMinutes(13),
+            'completed_at' => now()->subMinutes(8),
+        ]);
+
         $this->command->info('');
         $this->command->info('Seeded games:');
         $this->command->table(
             ['Status', 'Code', 'Owner', 'Join/View URL'],
             [
                 ['lobby', $lobbyCode, 'host-standard@dev.test', url("/dev/join-game/{$lobbyCode}")],
+                ['submitting', $submittingCode, 'host-submitting@dev.test', url("/dev/login-as/{$hostSubmitting->id}")],
+                ['submitting (all done)', $readyCode, 'host-ready@dev.test', url("/dev/login-as/{$hostReady->id}")],
+                ['playing (choosing)', $choosingCode, 'host-choosing@dev.test', url("/dev/login-as/{$hostChoosing->id}")],
                 ['playing', $playingCode, 'host-loaded@dev.test', url("/dev/join-game/{$playingCode}")],
+                ['grading_complete', $gradingDoneCode, 'host-grading-done@dev.test', url("/dev/login-as/{$hostGradingDone->id}")],
+                ['round_complete', $roundDoneCode, 'host-round-done@dev.test', url("/dev/login-as/{$hostRoundDone->id}")],
                 ['complete', $completedCode, 'host-veteran@dev.test', url("/games/{$completedCode}/lobby")],
             ]
         );
