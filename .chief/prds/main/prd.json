@@ -1,0 +1,166 @@
+{
+  "project": "Game Session Guardrails — Reconnection, Polling Fix, and E2E Tests",
+  "description": "\"How Does That Work?\" is a multiplayer party game built with Laravel 12 + Vue 3 (Inertia.js). Players join via QR code as anonymous guests (session-based identity), submit topics, and take turns explaining things while being graded by AI. Currently, the game has several fragility issues: if a player refreshes their browser or accidentally closes it, they lose their session and get stuck. The host can't rejoin an in-progress game from the dashboard. There's also a bug where guest players aren't polling for game state updates during the submit/play phases, causing the game to stall. This PRD defines \"guardrails\" — resilience features that keep the game running smoothly even when players make mistakes like refreshing, closing tabs, or losing connectivity.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add reconnect token to players table",
+      "description": "As a developer, I need a persistent reconnect token stored in the database so that guest players can be re-identified even after losing their Laravel session.",
+      "acceptanceCriteria": [
+        "Add `reconnect_token` column (UUID, nullable) to `players` table via migration",
+        "Update the `Player` model: `reconnect_token` is fillable and included in casts if needed",
+        "When a new player is created in `JoinController::store()`, generate a UUID v4 and store it as `reconnect_token`",
+        "Existing players without a token are unaffected (column is nullable)",
+        "Migration runs cleanly on both fresh and existing databases",
+        "Typecheck passes (`npm run lint`, `composer lint`)",
+        "Existing tests pass (`composer test`)"
+      ],
+      "priority": 1,
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Diagnose and fix the long polling bug",
+      "description": "As a player, I need the game to automatically update my screen when the game state changes (e.g., host starts the game, another player chooses a topic) so that I'm not stuck on a stale screen. The user reported that after all players submit topics and the host starts the game, guest players do not see any network polling activity. Only the host's browser shows polls. On refresh, guests get sent back to the lobby instead of the play screen. The bug likely involves one or more of: (a) `Submit.vue` not starting its poll interval for guests who have submitted, (b) the `submission-status` endpoint not recognizing guest sessions correctly, (c) the `isActivePlayer` or `has_submitted` props being wrong when the page renders for guests, or (d) an Inertia navigation issue where `router.visit()` doesn't preserve the guest's session context. Also check that `Play.vue` polling actually starts for non-active guest players — the `playState` endpoint requires session auth and may be returning 403 for guests.",
+      "acceptanceCriteria": [
+        "Identify root cause of why guest players are not polling on the submit and/or play screens",
+        "After host clicks \"Start Submission Phase\", all players (host and guests) navigate to `/submit` within one poll cycle (~3 seconds)",
+        "After all players submit topics and host clicks \"Start Game\", all players navigate to `/play` within one poll cycle",
+        "On the play screen, non-active players poll `/play-state` every 3 seconds and see updated turn status",
+        "When grading completes, all players navigate to the results screen automatically",
+        "Verify fix works with 1 host + 2 guest players minimum",
+        "No console errors on any player's screen during the full game flow",
+        "Existing tests pass (`composer test`)"
+      ],
+      "priority": 1,
+      "passes": false
+    },
+    {
+      "id": "US-003",
+      "title": "Game state redirect logic",
+      "description": "As a player (host or guest), if I visit any game URL that doesn't match the current game state, I should be automatically redirected to the correct screen so I never get stuck on the wrong page. Currently, some controllers have ad-hoc redirect checks (e.g., `TopicController::show()` redirects to `/lobby` if not in `submitting` state), but there is no centralized middleware. This story adds a consistent redirect layer. It should work for both authenticated hosts and session-based guests. Redirect rules based on game status: `lobby` -\u003e `/games/{code}/lobby`, `submitting` -\u003e `/games/{code}/submit`, `playing` -\u003e `/games/{code}/play`, `grading_complete` -\u003e `/games/{code}/results/{latestCompletedTurnId}`, `round_complete` -\u003e `/games/{code}/round-complete`, `complete` -\u003e `/games/{code}/complete`.",
+      "acceptanceCriteria": [
+        "Create middleware (or equivalent centralized logic) that intercepts game page requests",
+        "If a player visits a game URL that doesn't match the current game status, they are redirected to the correct URL per the redirect rules table",
+        "Middleware correctly identifies both authenticated users (via `$request-\u003euser()`) and guest players (via session `player_id.{CODE}`)",
+        "Polling/API endpoints (JSON responses) are NOT affected by this middleware — only Inertia page requests",
+        "If the player is not a participant in the game (no session, no auth match), do not redirect — let the existing 403 logic handle it",
+        "Remove any ad-hoc redirect logic from individual controllers that is now handled by the middleware",
+        "Typecheck passes, existing tests pass"
+      ],
+      "priority": 2,
+      "passes": false
+    },
+    {
+      "id": "US-004",
+      "title": "Player reconnection via localStorage token",
+      "description": "As a guest player, if I lose my session (browser crash, tab close, cookie cleared) but revisit the join URL (QR code or shared link), I should be automatically reconnected to my existing player slot so the game isn't disrupted.",
+      "acceptanceCriteria": [
+        "When a guest player joins a game (`JoinController::store()`), store `{ reconnect_token, game_code, player_id }` in localStorage under a key like `hdtw_player_{CODE}`",
+        "When a guest visits `/join/{code}` (`JoinController::show()`), check localStorage for a matching `reconnect_token`",
+        "If a matching token is found in the database AND the player's `updated_at` is within the last 10 minutes: restore the session key (`player_id.{CODE}`) and redirect the player to the correct game screen (using the redirect rules from US-003)",
+        "If no match or token is stale (\u003e10 minutes): clear the localStorage entry for that game code and show the normal join form",
+        "The localStorage check should happen client-side (in the Vue join page component) with a server endpoint to validate the token",
+        "Add a new API endpoint: `POST /join/{code}/reconnect` that accepts `{ reconnect_token }` and returns `{ success: true, redirect_url }` or `{ success: false }`",
+        "The reconnect endpoint restores the session server-side and returns the correct redirect URL",
+        "When a player makes any game action (poll, submit topic, choose topic, etc.), touch `updated_at` on their player record to keep the 10-minute window alive",
+        "Typecheck passes, existing tests pass",
+        "Write at least one feature test: player joins, loses session, hits reconnect endpoint with valid token, session is restored"
+      ],
+      "priority": 2,
+      "passes": false
+    },
+    {
+      "id": "US-005",
+      "title": "Host reconnection from dashboard",
+      "description": "As a host, if I accidentally close my browser or navigate away during an in-progress game, I should be able to go to the dashboard and click a button to rejoin the game on the correct screen.",
+      "acceptanceCriteria": [
+        "On the Dashboard page, games with status `lobby`, `submitting`, `playing`, `grading_complete`, or `round_complete` show a \"Rejoin\" button/link",
+        "Clicking \"Rejoin\" navigates the host to the correct game URL based on current game status (same redirect rules as US-003)",
+        "The \"Rejoin\" link is visually prominent — not just the game code text, but an explicit action button",
+        "Games with status `complete` do NOT show \"Rejoin\" (they're finished)",
+        "Typecheck passes, existing tests pass"
+      ],
+      "priority": 2,
+      "passes": false
+    },
+    {
+      "id": "US-006",
+      "title": "Add polling status indicator",
+      "description": "As a player (or developer testing on mobile), I want to see a small visual indicator that confirms my browser is actively polling the server, so I can tell at a glance whether my connection is healthy.",
+      "acceptanceCriteria": [
+        "Add a small green dot indicator in the corner of the screen (bottom-right or top-right) on all game screens that poll (Lobby, Submit, Play)",
+        "The dot \"pulses\" (brief animation, e.g., scale up + fade) each time a successful poll response is received",
+        "If a poll fails (network error, non-200 response), the dot turns red/orange and stays solid (no pulse) until the next successful poll",
+        "The indicator is subtle and doesn't distract from gameplay — small (8-12px), semi-transparent when idle",
+        "Create the indicator as a reusable Vue component (e.g., `PollIndicator.vue`) that accepts a `lastPollAt` reactive ref or similar",
+        "Typecheck passes, existing tests pass"
+      ],
+      "priority": 3,
+      "passes": false
+    },
+    {
+      "id": "US-007",
+      "title": "Show QR code and join link on host screens beyond lobby",
+      "description": "As a host, I want access to the QR code and join link even after leaving the lobby screen, so I can re-share it with a player who dropped and needs to rejoin.",
+      "acceptanceCriteria": [
+        "On the Submit and Play screens, if the player is the host, show a collapsible/toggleable section with the QR code and join link",
+        "Default state: collapsed (don't clutter the UI). A small \"Share join link\" or similar button expands it",
+        "QR code and link are identical to what's shown on the Lobby screen",
+        "The `joinUrl` prop is already available via the game code; generate QR client-side same as Lobby.vue",
+        "Typecheck passes, existing tests pass"
+      ],
+      "priority": 3,
+      "passes": false
+    },
+    {
+      "id": "US-008",
+      "title": "Expand DevSeeder with game states for E2E testing",
+      "description": "As a developer, I need the DevSeeder to create users and games in specific, well-defined states so that Playwright tests can log in as a known user and test a specific point in the game flow. The existing DevSeeder creates 4 users and 3 games (lobby, playing, completed). Additional seeded states are needed to cover the full flow. Each seeded \"scenario\" represents a user frozen at a specific moment in the game — the Playwright test logs in as that user and verifies the next action works. New seeded scenarios: (1) Submitting phase — host view, (2) Submitting phase — all submitted, host ready to start, (3) Playing phase — active player choosing, (4) Grading complete — host can advance, (5) Round complete — host can start next round.",
+      "acceptanceCriteria": [
+        "DevSeeder creates the additional scenarios with deterministic, predictable data",
+        "Each scenario has a clearly named host user (e.g., `host-submitting@dev.test`, `host-ready-to-start@dev.test`) for easy identification",
+        "Dev dashboard (`/dev/`) lists all scenarios with login links",
+        "`php artisan migrate:fresh --seed` runs cleanly with all new scenarios",
+        "Each scenario's game is in exactly the state described — no ambiguity",
+        "Document (as comments in the seeder) which user to log in as and what they should see",
+        "Existing tests still pass after seeder changes"
+      ],
+      "priority": 3,
+      "passes": false
+    },
+    {
+      "id": "US-009",
+      "title": "Playwright test infrastructure — seed-based pattern",
+      "description": "As a developer, I need a Playwright test setup that reseeds the database before each test suite and uses dev routes to log in as specific users, so tests are fast, deterministic, and don't require simulating the full join/create flow.",
+      "acceptanceCriteria": [
+        "Create a Playwright global setup or `beforeAll` hook that runs `php artisan migrate:fresh --seed --force`",
+        "Tests should NOT set `APP_ENV=local` to something else — the DevSeeder only runs in `local` environment, so ensure the test environment is `local` (or update seeder to also run in `testing`)",
+        "Create a Playwright helper function: `loginAs(page, userId)` that navigates to `/dev/login-as/{userId}` and waits for redirect",
+        "Create a Playwright helper function: `expectUrl(page, urlPattern)` that asserts the current URL matches",
+        "All helpers should be in a shared file (e.g., `tests/e2e/helpers.ts`)",
+        "npm run test:e2e script works in headless mode",
+        "Reseed + full test suite completes in under 30 seconds",
+        "Tests work against the local dev server (use `APP_URL` from env or default to `http://how-does-that-work.test`)"
+      ],
+      "priority": 4,
+      "passes": false
+    },
+    {
+      "id": "US-010",
+      "title": "Playwright navigation tests for game flow",
+      "description": "As a developer, I need Playwright tests that verify each step of the game flow by logging in as a seeded user at a specific game state, pressing the main action button, and confirming navigation to the correct next page. Test cases: (1) Host starts submission phase, (2) Host submits topics, (3) Host starts game, (4) Host advances turn, (5) Host reconnects from dashboard, (6) Player sees correct screen on refresh.",
+      "acceptanceCriteria": [
+        "Each test follows the pattern: navigate to URL → perform action → assert final URL",
+        "Tests do not wait for polling or real-time updates — they test button-click navigation only",
+        "Tests use the `loginAs()` helper and seeded user IDs from US-008",
+        "Guest player tests use the `/dev/join-game/{code}` dev route to establish session",
+        "All tests pass in headless Chromium",
+        "No test takes longer than 10 seconds individually",
+        "Tests are in a single file or logically grouped files under `tests/e2e/`"
+      ],
+      "priority": 4,
+      "passes": false
+    }
+  ]
+}
