@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { onMounted, onUnmounted, ref } from 'vue';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { type BreadcrumbItem } from '@/types';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
+import { type BreadcrumbItem } from '@/types';
 
 const props = defineProps<{
     game: {
@@ -28,7 +28,10 @@ const props = defineProps<{
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: dashboard().url },
-    { title: `Submit Topics — ${props.game.code}`, href: `/games/${props.game.code}/submit` },
+    {
+        title: `Submit Topics — ${props.game.code}`,
+        href: `/games/${props.game.code}/submit`,
+    },
 ];
 
 const form = useForm({
@@ -57,6 +60,17 @@ onMounted(() => {
     }
 });
 
+// When a guest submits topics, Inertia re-renders with has_submitted=true but onMounted
+// doesn't re-fire (same component instance). Watch the prop to start polling after submission.
+watch(
+    () => props.player.has_submitted,
+    (submitted) => {
+        if (submitted && !pollInterval) {
+            pollInterval = setInterval(pollStatus, 3000);
+        }
+    },
+);
+
 onUnmounted(() => {
     if (pollInterval) {
         clearInterval(pollInterval);
@@ -65,9 +79,15 @@ onUnmounted(() => {
 
 async function pollStatus() {
     try {
-        const response = await fetch(`/games/${props.game.code}/submission-status`, {
-            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        });
+        const response = await fetch(
+            `/games/${props.game.code}/submission-status`,
+            {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            },
+        );
         if (response.ok) {
             const data = await response.json();
             submittedCount.value = data.submittedCount;
@@ -98,16 +118,25 @@ async function pollStatus() {
                     <!-- Left: submission form or waiting message -->
                     <div class="space-y-8">
                         <div class="text-center">
-                            <h1 class="text-3xl font-bold tracking-tight">Submit Your Topics</h1>
+                            <h1 class="text-3xl font-bold tracking-tight">
+                                Submit Your Topics
+                            </h1>
                             <p class="mt-1 text-muted-foreground">
                                 Enter three things for other players to explain.
                             </p>
                         </div>
 
                         <!-- Submitted state -->
-                        <div v-if="player.has_submitted" class="rounded-xl border p-8 text-center">
-                            <p class="text-lg font-semibold">Topics submitted!</p>
-                            <p class="mt-2 text-muted-foreground">You can start the game whenever you're ready.</p>
+                        <div
+                            v-if="player.has_submitted"
+                            class="rounded-xl border p-8 text-center"
+                        >
+                            <p class="text-lg font-semibold">
+                                Topics submitted!
+                            </p>
+                            <p class="mt-2 text-muted-foreground">
+                                You can start the game whenever you're ready.
+                            </p>
                         </div>
 
                         <!-- Submission form -->
@@ -123,17 +152,31 @@ async function pollStatus() {
                                     maxlength="120"
                                     placeholder="How does a microwave work?"
                                 />
-                                <p v-if="form.errors[`topics.${n - 1}`]" class="text-sm text-destructive">
+                                <p
+                                    v-if="form.errors[`topics.${n - 1}`]"
+                                    class="text-sm text-destructive"
+                                >
                                     {{ form.errors[`topics.${n - 1}`] }}
                                 </p>
                             </div>
 
-                            <p v-if="form.errors.game" class="text-sm text-destructive">
+                            <p
+                                v-if="form.errors.game"
+                                class="text-sm text-destructive"
+                            >
                                 {{ form.errors.game }}
                             </p>
 
-                            <Button type="submit" class="w-full" :disabled="form.processing">
-                                {{ form.processing ? 'Submitting…' : 'Submit Topics' }}
+                            <Button
+                                type="submit"
+                                class="w-full"
+                                :disabled="form.processing"
+                            >
+                                {{
+                                    form.processing
+                                        ? 'Submitting…'
+                                        : 'Submit Topics'
+                                }}
                             </Button>
                         </form>
                     </div>
@@ -141,9 +184,12 @@ async function pollStatus() {
                     <!-- Right: player progress + start game -->
                     <div class="space-y-6">
                         <div>
-                            <h2 class="text-xl font-semibold">Player Submissions</h2>
+                            <h2 class="text-xl font-semibold">
+                                Player Submissions
+                            </h2>
                             <p class="mt-1 text-sm text-muted-foreground">
-                                {{ submittedCount }} / {{ totalCount }} players have submitted
+                                {{ submittedCount }} / {{ totalCount }} players
+                                have submitted
                             </p>
                         </div>
 
@@ -155,32 +201,66 @@ async function pollStatus() {
                             >
                                 <span
                                     class="flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold"
-                                    :class="p.has_submitted ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'"
+                                    :class="
+                                        p.has_submitted
+                                            ? 'bg-green-100 text-green-700'
+                                            : 'bg-muted text-muted-foreground'
+                                    "
                                 >
                                     {{ p.has_submitted ? '✓' : '…' }}
                                 </span>
-                                <span class="flex-1 text-sm font-medium">{{ p.name }}</span>
-                                <span class="text-xs" :class="p.has_submitted ? 'text-green-600' : 'text-muted-foreground'">
-                                    {{ p.has_submitted ? 'Submitted' : 'Pending' }}
+                                <span class="flex-1 text-sm font-medium">{{
+                                    p.name
+                                }}</span>
+                                <span
+                                    class="text-xs"
+                                    :class="
+                                        p.has_submitted
+                                            ? 'text-green-600'
+                                            : 'text-muted-foreground'
+                                    "
+                                >
+                                    {{
+                                        p.has_submitted
+                                            ? 'Submitted'
+                                            : 'Pending'
+                                    }}
                                 </span>
                             </li>
                         </ul>
 
-                        <p v-if="startForm.errors.game" class="text-sm text-destructive">
+                        <p
+                            v-if="startForm.errors.game"
+                            class="text-sm text-destructive"
+                        >
                             {{ startForm.errors.game }}
                         </p>
 
-                        <div v-if="hostCredits !== null && hostCredits <= 0" class="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                        <div
+                            v-if="hostCredits !== null && hostCredits <= 0"
+                            class="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
+                        >
                             Add credits to start a game.
-                            <a href="/billing" class="underline font-medium ml-1">Go to Billing →</a>
+                            <a
+                                href="/billing"
+                                class="ml-1 font-medium underline"
+                                >Go to Billing →</a
+                            >
                         </div>
 
                         <Button
                             class="w-full"
-                            :disabled="startForm.processing || (hostCredits !== null && hostCredits <= 0)"
+                            :disabled="
+                                startForm.processing ||
+                                (hostCredits !== null && hostCredits <= 0)
+                            "
                             @click="startGame"
                         >
-                            {{ startForm.processing ? 'Starting…' : 'Start Game' }}
+                            {{
+                                startForm.processing
+                                    ? 'Starting…'
+                                    : 'Start Game'
+                            }}
                         </Button>
                     </div>
                 </div>
@@ -189,23 +269,35 @@ async function pollStatus() {
     </AppLayout>
 
     <!-- Guest view: simple page layout -->
-    <div v-else class="flex min-h-screen flex-col items-center justify-center bg-background p-6">
+    <div
+        v-else
+        class="flex min-h-screen flex-col items-center justify-center bg-background p-6"
+    >
         <div class="w-full max-w-md space-y-8">
             <div class="text-center">
-                <h1 class="text-3xl font-bold tracking-tight">Submit Your Topics</h1>
+                <h1 class="text-3xl font-bold tracking-tight">
+                    Submit Your Topics
+                </h1>
                 <p class="mt-1 text-muted-foreground">
                     Enter three things for other players to explain.
                 </p>
             </div>
 
             <!-- Submitted state -->
-            <div v-if="player.has_submitted" class="rounded-xl border p-8 text-center">
+            <div
+                v-if="player.has_submitted"
+                class="rounded-xl border p-8 text-center"
+            >
                 <p class="text-lg font-semibold">Topics submitted!</p>
-                <p class="mt-2 text-muted-foreground">Waiting for others to submit…</p>
+                <p class="mt-2 text-muted-foreground">
+                    Waiting for others to submit…
+                </p>
                 <p class="mt-4 text-2xl font-bold">
                     {{ submittedCount }} / {{ totalCount }}
                 </p>
-                <p class="text-sm text-muted-foreground">players have submitted</p>
+                <p class="text-sm text-muted-foreground">
+                    players have submitted
+                </p>
             </div>
 
             <!-- Submission form -->
@@ -221,7 +313,10 @@ async function pollStatus() {
                         maxlength="120"
                         placeholder="How does a microwave work?"
                     />
-                    <p v-if="form.errors[`topics.${n - 1}`]" class="text-sm text-destructive">
+                    <p
+                        v-if="form.errors[`topics.${n - 1}`]"
+                        class="text-sm text-destructive"
+                    >
                         {{ form.errors[`topics.${n - 1}`] }}
                     </p>
                 </div>
@@ -230,7 +325,11 @@ async function pollStatus() {
                     {{ form.errors.game }}
                 </p>
 
-                <Button type="submit" class="w-full" :disabled="form.processing">
+                <Button
+                    type="submit"
+                    class="w-full"
+                    :disabled="form.processing"
+                >
                     {{ form.processing ? 'Submitting…' : 'Submit Topics' }}
                 </Button>
             </form>
