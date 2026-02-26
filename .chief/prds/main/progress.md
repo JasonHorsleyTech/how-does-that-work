@@ -92,3 +92,17 @@
   - Dashboard games table already had all the data needed — just needed to add the computed URL from the controller
   - The `DashboardTest` suite covers the dashboard page rendering — 6 tests all pass with the changes
 ---
+
+## 2026-02-26 - US-006
+- What was implemented: Added a polling status indicator — a small green dot in the bottom-right corner of all game screens that pulses on each successful poll and turns orange on failure
+- Files changed:
+  - `resources/js/components/PollIndicator.vue` (new) — reusable component accepting `lastPollAt` and `error` props; uses CSS transition for pulse animation
+  - `resources/js/pages/games/Lobby.vue` — added `lastPollAt`/`pollError` refs, updated `pollPlayers()` to track success/error, added PollIndicator to template
+  - `resources/js/pages/games/Submit.vue` — added `lastPollAt`/`pollError` refs, updated `pollStatus()` to track success/error, added PollIndicator to template
+  - `resources/js/pages/games/Play.vue` — added `lastPollAt`/`pollError` refs, updated `pollState()` to track success/error, added PollIndicator to template
+- **Learnings for future iterations:**
+  - PollIndicator is positioned `fixed` so it works in both host (AppLayout with sidebar) and guest (full-screen) views without layout-specific adjustments
+  - The pulse animation uses a `setTimeout` to toggle a `pulsing` ref that adds `scale-150 opacity-80` Tailwind classes, driven by a `watch` on `lastPollAt` — simple and avoids CSS animation retrigger complexity
+  - Both non-200 responses and network errors (catch) should update `lastPollAt` alongside `pollError` to ensure the indicator reflects the latest state
+  - The component is placed outside the `v-if`/`v-else` layout blocks (host vs guest) so it renders once regardless of which view is active
+---
