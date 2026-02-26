@@ -12,6 +12,8 @@
 - Inertia.js reuses component instances on same-page redirects — `onMounted` does NOT re-fire when props update via `form.post()` redirect. Use `watch` on reactive props for post-submission logic.
 - All polling endpoints (players, submission-status, play-state) use consistent session-based guest auth via `player_id.{CODE}` — no auth issues for guests
 - Polling in all game pages uses raw `setInterval` (no composable) with 3-second intervals
+- Game page routes (GET Inertia pages) are wrapped in `RedirectToGameState` middleware; polling/API/POST routes are NOT
+- Game status → correct URL mapping is in `RedirectToGameState::correctUrlForStatus()` — use this as the source of truth for redirect rules
 ---
 
 ## 2026-02-26 - US-001
@@ -38,4 +40,20 @@
   - Server-side polling endpoints all return `JsonResponse` directly — no header-dependent behavior for `Accept` or `X-Requested-With`
   - Play.vue, Results.vue, and RoundComplete.vue polling logic is correct — non-active/non-host players always poll in `onMounted`
   - The `TopicController::store()` redirects to `/games/{code}/submit` after submission (line 89)
+---
+
+## 2026-02-26 - US-003
+- What was implemented: Centralized game state redirect middleware (`RedirectToGameState`) that intercepts game page requests and redirects players to the correct URL based on current game status
+- Files changed:
+  - `app/Http/Middleware/RedirectToGameState.php` (new) — middleware with redirect rules for all game statuses
+  - `routes/web.php` — reorganized game routes into 3 groups: page routes (with middleware), polling/API endpoints, and POST action routes
+  - `app/Http/Controllers/TopicController.php` — removed ad-hoc `status !== 'submitting'` redirect from `show()`
+  - `app/Http/Controllers/TurnController.php` — removed ad-hoc `complete`, `round_complete`, and `!== 'playing'` redirects from `show()`
+- **Learnings for future iterations:**
+  - The middleware only applies to game page GET routes (Inertia renders), not polling endpoints or POST actions — this is enforced via route grouping, not request type detection
+  - `$request->is()` matches URL paths against patterns — useful for comparing current URL to expected URL
+  - The `grading` status (while AI is grading) maps to `/play` since the player should stay on the play screen
+  - `grading_complete` requires querying the latest completed turn to build the results URL
+  - Existing tests that checked controller-level redirects (e.g., `TopicSubmissionTest`, `GameCompleteTest`) continue to pass because the middleware performs the same redirects
+  - DevController has a bug: `joinGame()` uses unscoped `'player_id'` session key instead of `"player_id.{$code}"` — may need fixing in future stories
 ---
