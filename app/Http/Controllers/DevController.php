@@ -52,7 +52,7 @@ class DevController extends Controller
             'score' => 0,
         ]);
 
-        $request->session()->put('player_id', $player->id);
+        $request->session()->put("player_id.{$code}", $player->id);
 
         return redirect("/games/{$code}/lobby");
     }

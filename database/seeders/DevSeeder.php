@@ -76,7 +76,8 @@ class DevSeeder extends Seeder
         );
 
         // --- Lobby game (host-standard) ---
-        $lobbyCode = $this->uniqueCode();
+        // Deterministic code for E2E tests
+        $lobbyCode = 'LOBBY1';
         $lobbyGame = Game::create([
             'host_user_id' => $hostStandard->id,
             'code' => $lobbyCode,
@@ -93,9 +94,26 @@ class DevSeeder extends Seeder
             'has_submitted' => false,
             'score' => 0,
         ]);
+        // Guest players so "Start Submission Phase" button is enabled (requires 2+ non-host)
+        Player::create([
+            'game_id' => $lobbyGame->id,
+            'user_id' => null,
+            'name' => 'Quick Parrot',
+            'is_host' => false,
+            'has_submitted' => false,
+            'score' => 0,
+        ]);
+        Player::create([
+            'game_id' => $lobbyGame->id,
+            'user_id' => null,
+            'name' => 'Sly Gecko',
+            'is_host' => false,
+            'has_submitted' => false,
+            'score' => 0,
+        ]);
 
         // --- Playing game (host-loaded) ---
-        $playingCode = $this->uniqueCode();
+        $playingCode = 'PLAYNG';
         $playingGame = Game::create([
             'host_user_id' => $hostLoaded->id,
             'code' => $playingCode,
@@ -205,7 +223,7 @@ class DevSeeder extends Seeder
         ]);
 
         // --- Completed game (host-veteran) ---
-        $completedCode = $this->uniqueCode();
+        $completedCode = 'COMPLT';
         $completedGame = Game::create([
             'host_user_id' => $hostVeteran->id,
             'code' => $completedCode,
@@ -302,7 +320,7 @@ class DevSeeder extends Seeder
 
         // --- Scenario 1: Submitting phase — host has NOT submitted yet ---
         // Log in as host-submitting@dev.test → should see topic submission form at /games/{code}/submit
-        $submittingCode = $this->uniqueCode();
+        $submittingCode = 'SUBMIT';
         $submittingGame = Game::create([
             'host_user_id' => $hostSubmitting->id,
             'code' => $submittingCode,
@@ -338,7 +356,7 @@ class DevSeeder extends Seeder
 
         // --- Scenario 2: Submitting phase — all submitted, host ready to start ---
         // Log in as host-ready@dev.test → should see "Start Game" button at /games/{code}/submit
-        $readyCode = $this->uniqueCode();
+        $readyCode = 'READY1';
         $readyGame = Game::create([
             'host_user_id' => $hostReady->id,
             'code' => $readyCode,
@@ -384,7 +402,7 @@ class DevSeeder extends Seeder
 
         // --- Scenario 3: Playing phase — active player is choosing a topic ---
         // Log in as host-choosing@dev.test → should see play screen at /games/{code}/play with active player choosing
-        $choosingCode = $this->uniqueCode();
+        $choosingCode = 'CHOOSE';
         $choosingGame = Game::create([
             'host_user_id' => $hostChoosing->id,
             'code' => $choosingCode,
@@ -450,7 +468,7 @@ class DevSeeder extends Seeder
 
         // --- Scenario 4: Grading complete — host can advance to next turn ---
         // Log in as host-grading-done@dev.test → should see results screen at /games/{code}/results/{turnId}
-        $gradingDoneCode = $this->uniqueCode();
+        $gradingDoneCode = 'GRADED';
         $gradingDoneGame = Game::create([
             'host_user_id' => $hostGradingDone->id,
             'code' => $gradingDoneCode,
@@ -521,7 +539,7 @@ class DevSeeder extends Seeder
 
         // --- Scenario 5: Round complete — host can start next round ---
         // Log in as host-round-done@dev.test → should see round complete screen at /games/{code}/round-complete
-        $roundDoneCode = $this->uniqueCode();
+        $roundDoneCode = 'RNDDNE';
         $roundDoneGame = Game::create([
             'host_user_id' => $hostRoundDone->id,
             'code' => $roundDoneCode,
