@@ -144,7 +144,7 @@
         "Tests work against the local dev server (use `APP_URL` from env or default to `http://how-does-that-work.test`)"
       ],
       "priority": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-010",

@@ -19,6 +19,9 @@
 - `RedirectToGameState::correctUrlForStatus()` is `public static` — reusable from any controller/endpoint
 - To pass data from a POST redirect to the destination page, use Laravel session flash + Inertia shared props via `HandleInertiaRequests::share()` — access it as `usePage().props.flash.key`
 - CSRF token for fetch() requests: read from `XSRF-TOKEN` cookie, decode with `decodeURIComponent`, send in `X-XSRF-TOKEN` header
+- E2E tests: `npm run test:e2e` runs Playwright; global setup seeds DB once; shared helpers in `tests/e2e/helpers.ts` (`loginAs`, `expectUrl`)
+- E2E tests use dev routes (`/dev/login-as/{userId}`, `/dev/completed-turn`, `/dev/completed-game`) for setup — no UI simulation needed
+- Playwright browsers need separate install: `npx playwright install chromium`
 ---
 
 ## 2026-02-26 - US-001
@@ -140,4 +143,24 @@
   - The `topic_choices` column on turns must be populated as an array of topic IDs for the `choosing` state to work correctly in the UI
   - For `round_complete` scenarios, set `max_rounds=2` so the host has a "Start Next Round" button (with `max_rounds=1`, it would go to `complete`)
   - Each scenario's comment block documents which user to log in as and what they should see — critical for E2E test authors
+---
+
+## 2026-02-26 - US-009
+- What was implemented: Playwright test infrastructure with seed-based pattern — global setup, shared helpers, and npm script
+- Files changed:
+  - `tests/e2e/global-setup.ts` (new) — Playwright global setup that runs `php artisan migrate:fresh --seed --force` once before the entire test suite
+  - `tests/e2e/helpers.ts` (new) — shared helper functions: `loginAs(page, userId)` and `expectUrl(page, urlPattern)`
+  - `playwright.config.ts` — added `globalSetup` pointing to `tests/e2e/global-setup.ts`
+  - `package.json` — added `"test:e2e": "playwright test"` script
+  - `tests/e2e/game-complete.spec.ts` — removed per-file `beforeAll` seed (now handled by global setup), fixed strict locator for "Rapid Owl"
+  - `tests/e2e/results.spec.ts` — removed per-file `beforeAll` seed (now handled by global setup)
+  - `app/Http/Middleware/RedirectToGameState.php` — allow viewing individual turn results for `complete` games (not just `grading_complete`)
+- **Learnings for future iterations:**
+  - Playwright global setup runs once before the entire suite — much faster than per-file `beforeAll` seeds (4s total vs ~7s per file)
+  - The `loginAs()` helper navigates to `/dev/login-as/{userId}` and waits for redirect to `/dashboard` — userId is the numeric database ID
+  - `expectUrl()` accepts both string and RegExp patterns, wrapping Playwright's `toHaveURL()`
+  - The `RedirectToGameState` middleware blocks results page access for `complete` games — had to add `complete` to the allowed statuses for `/results/*` URLs
+  - Pre-existing test bugs: "Rapid Owl" text matched 3 elements (strict mode violation) — use `getByRole('heading', ...)` for unique matches
+  - Playwright browsers must be installed separately via `npx playwright install chromium` — the `@playwright/test` npm package doesn't include them
+  - The `APP_URL` env var (default: `http://how-does-that-work.test`) is used as `baseURL` in Playwright config — tests use relative URLs like `/dev/login-as/1`
 ---
