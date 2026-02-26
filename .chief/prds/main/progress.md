@@ -11,6 +11,8 @@
 - Migrations use `php artisan make:migration` naming convention
 - Inertia.js reuses component instances on same-page redirects — `onMounted` does NOT re-fire when props update via `form.post()` redirect. Use `watch` on reactive props for post-submission logic.
 - All polling endpoints (players, submission-status, play-state) use consistent session-based guest auth via `player_id.{CODE}` — no auth issues for guests
+- DevController queries use `LIKE 'host-%@dev.test'` to auto-discover all dev users — new scenario users are automatically listed on the dashboard
+- DevSeeder scenario users follow naming convention: `host-{scenario}@dev.test` (e.g., `host-submitting@dev.test`, `host-ready@dev.test`)
 - Polling in all game pages uses raw `setInterval` (no composable) with 3-second intervals
 - Game page routes (GET Inertia pages) are wrapped in `RedirectToGameState` middleware; polling/API/POST routes are NOT
 - Game status → correct URL mapping is in `RedirectToGameState::correctUrlForStatus()` — use this as the source of truth for redirect rules
@@ -119,4 +121,23 @@
   - QR code generation uses the `qrcode` npm package with `QRCode.toDataURL()` — async, must be called in `onMounted`
   - Host views in game pages use `AppLayout` wrapper with a `v-if="player.is_host"` / `v-else` pattern — host-only UI goes inside the AppLayout block
   - The JoinLinkPanel is placed after the main content area but inside the AppLayout block, so it appears at the bottom of the host's view
+---
+
+## 2026-02-26 - US-008
+- What was implemented: Expanded DevSeeder with 5 new game state scenarios for E2E testing, plus 5 new host user accounts
+- New scenarios:
+  1. **Submitting (host view)** — `host-submitting@dev.test` — game in `submitting` status, host hasn't submitted yet, 2 guests also not submitted
+  2. **Submitting (all submitted)** — `host-ready@dev.test` — game in `submitting` status, all 3 players submitted 3 topics each, host sees "Start Game"
+  3. **Playing (choosing)** — `host-choosing@dev.test` — game in `playing` status, first turn is `choosing` with `topic_choices` populated, second turn is `pending`
+  4. **Grading complete** — `host-grading-done@dev.test` — game in `grading_complete` status, first turn complete with score/feedback, second turn pending
+  5. **Round complete** — `host-round-done@dev.test` — game in `round_complete` status with `max_rounds=2`, both turns in round 1 complete
+- Files changed:
+  - `database/seeders/DevSeeder.php` — added 5 new users + 5 new game scenarios with full player/topic/turn data
+  - `app/Http/Controllers/DevController.php` — updated `index()` to use `LIKE 'host-%@dev.test'` pattern instead of hardcoded email list, so new scenario users auto-appear
+  - `resources/views/dev/index.blade.php` — added descriptions for new scenario accounts, added CSS badge styles for `grading_complete` and `round_complete` statuses
+- **Learnings for future iterations:**
+  - DevController queries were hardcoded to specific emails — using `LIKE 'host-%@dev.test'` pattern is more maintainable and auto-includes new scenario users
+  - The `topic_choices` column on turns must be populated as an array of topic IDs for the `choosing` state to work correctly in the UI
+  - For `round_complete` scenarios, set `max_rounds=2` so the host has a "Start Next Round" button (with `max_rounds=1`, it would go to `complete`)
+  - Each scenario's comment block documents which user to log in as and what they should see — critical for E2E test authors
 ---
