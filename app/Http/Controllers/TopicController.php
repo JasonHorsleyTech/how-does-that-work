@@ -19,10 +19,6 @@ class TopicController extends Controller
             abort(403);
         }
 
-        if ($game->status !== 'submitting') {
-            return redirect("/games/{$game->code}/lobby");
-        }
-
         $allPlayers = $game->players()->get(['id', 'name', 'has_submitted']);
         $submittedCount = $allPlayers->where('has_submitted', true)->count();
         $totalCount = $allPlayers->count();
