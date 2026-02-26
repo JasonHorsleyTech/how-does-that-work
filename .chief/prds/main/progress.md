@@ -80,3 +80,15 @@
   - `$player->touch()` is an efficient way to update `updated_at` without changing other fields
   - The `flushSession()` method in tests clears session data — useful for simulating session loss in reconnect tests
 ---
+
+## 2026-02-26 - US-005
+- What was implemented: Host reconnection from dashboard — active games show a "Rejoin" button that navigates to the correct game screen
+- Files changed:
+  - `app/Http/Controllers/DashboardController.php` — added `rejoin_url` field using `RedirectToGameState::correctUrlForStatus()`, only for non-complete games
+  - `resources/js/pages/Dashboard.vue` — added `rejoin_url` to `GameSummary` interface, added Actions column with blue "Rejoin" button that renders conditionally when `rejoin_url` is non-null; also fixed pre-existing unused `props` variable lint error
+- **Learnings for future iterations:**
+  - `RedirectToGameState::correctUrlForStatus()` is the single source of truth for game status → URL mapping — reuse it whenever you need to compute where a player should be
+  - The `grading_complete` status requires a DB query (to find the latest completed turn), so computing `rejoin_url` server-side is better than client-side for this status
+  - Dashboard games table already had all the data needed — just needed to add the computed URL from the controller
+  - The `DashboardTest` suite covers the dashboard page rendering — 6 tests all pass with the changes
+---
