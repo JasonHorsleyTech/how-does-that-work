@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
+import JoinLinkPanel from '@/components/JoinLinkPanel.vue';
 import PollIndicator from '@/components/PollIndicator.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -273,6 +274,8 @@ async function pollStatus() {
                         </Button>
                     </div>
                 </div>
+
+                <JoinLinkPanel :game-code="game.code" />
             </div>
         </div>
     </AppLayout>

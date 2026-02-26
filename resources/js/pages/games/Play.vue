@@ -2,6 +2,7 @@
 import { Head, useForm } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
+import JoinLinkPanel from '@/components/JoinLinkPanel.vue';
 import PollIndicator from '@/components/PollIndicator.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
@@ -497,6 +498,8 @@ async function pollState() {
                     </p>
                     <p class="mt-2 text-muted-foreground">Almost time!</p>
                 </div>
+
+                <JoinLinkPanel :game-code="game.code" />
             </div>
         </div>
     </AppLayout>
