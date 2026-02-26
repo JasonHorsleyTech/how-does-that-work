@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Game;
 use App\Models\Player;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class JoinController extends Controller
@@ -74,6 +75,7 @@ class JoinController extends Controller
             'is_host' => false,
             'has_submitted' => false,
             'score' => 0,
+            'reconnect_token' => Str::uuid()->toString(),
         ]);
 
         $request->session()->put("player_id.{$game->code}", $player->id);

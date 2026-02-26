@@ -18,6 +18,7 @@ class Player extends Model
         'is_host',
         'has_submitted',
         'score',
+        'reconnect_token',
     ];
 
     protected function casts(): array
