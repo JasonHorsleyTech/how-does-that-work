@@ -2,6 +2,7 @@
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import QRCode from 'qrcode';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import PollIndicator from '@/components/PollIndicator.vue';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
@@ -41,6 +42,8 @@ function startSubmission() {
 }
 
 let pollInterval: ReturnType<typeof setInterval> | null = null;
+const lastPollAt = ref(0);
+const pollError = ref(false);
 
 onMounted(async () => {
     // Store reconnect data in localStorage if flashed from join
@@ -85,6 +88,8 @@ async function pollPlayers() {
             },
         });
         if (response.ok) {
+            pollError.value = false;
+            lastPollAt.value = Date.now();
             const data = await response.json();
             players.value = data.players;
 
@@ -92,9 +97,13 @@ async function pollPlayers() {
                 clearInterval(pollInterval!);
                 router.visit(`/games/${props.game.code}/submit`);
             }
+        } else {
+            pollError.value = true;
+            lastPollAt.value = Date.now();
         }
     } catch {
-        // Ignore polling errors silently
+        pollError.value = true;
+        lastPollAt.value = Date.now();
     }
 }
 </script>
@@ -258,4 +267,6 @@ async function pollPlayers() {
             </div>
         </div>
     </div>
+
+    <PollIndicator :last-poll-at="lastPollAt" :error="pollError" />
 </template>

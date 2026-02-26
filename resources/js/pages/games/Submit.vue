@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
+import PollIndicator from '@/components/PollIndicator.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,6 +53,8 @@ const submittedCount = ref(props.submittedCount);
 const totalCount = ref(props.totalCount);
 const players = ref(props.players);
 let pollInterval: ReturnType<typeof setInterval> | null = null;
+const lastPollAt = ref(0);
+const pollError = ref(false);
 
 onMounted(() => {
     // Host always polls to see player submission progress; guests poll after submission
@@ -89,6 +92,8 @@ async function pollStatus() {
             },
         );
         if (response.ok) {
+            pollError.value = false;
+            lastPollAt.value = Date.now();
             const data = await response.json();
             submittedCount.value = data.submittedCount;
             totalCount.value = data.totalCount;
@@ -100,9 +105,13 @@ async function pollStatus() {
                 clearInterval(pollInterval!);
                 router.visit(`/games/${props.game.code}/play`);
             }
+        } else {
+            pollError.value = true;
+            lastPollAt.value = Date.now();
         }
     } catch {
-        // Ignore polling errors silently
+        pollError.value = true;
+        lastPollAt.value = Date.now();
     }
 }
 </script>
@@ -335,4 +344,6 @@ async function pollStatus() {
             </form>
         </div>
     </div>
+
+    <PollIndicator :last-poll-at="lastPollAt" :error="pollError" />
 </template>
