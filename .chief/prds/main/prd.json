@@ -160,7 +160,7 @@
         "Tests are in a single file or logically grouped files under `tests/e2e/`"
       ],
       "priority": 4,
-      "passes": false
+      "passes": true
     }
   ]
 }

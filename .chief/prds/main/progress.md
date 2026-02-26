@@ -22,6 +22,9 @@
 - E2E tests: `npm run test:e2e` runs Playwright; global setup seeds DB once; shared helpers in `tests/e2e/helpers.ts` (`loginAs`, `expectUrl`)
 - E2E tests use dev routes (`/dev/login-as/{userId}`, `/dev/completed-turn`, `/dev/completed-game`) for setup — no UI simulation needed
 - Playwright browsers need separate install: `npx playwright install chromium`
+- DevSeeder uses deterministic game codes (LOBBY1, PLAYNG, COMPLT, SUBMIT, READY1, CHOOSE, GRADED, RNDDNE) — E2E tests reference these directly
+- Deterministic user IDs: test@example.com=1, host-loaded=2, host-standard=3, host-broke=4, host-veteran=5, host-submitting=6, host-ready=7, host-choosing=8, host-grading-done=9, host-round-done=10
+- Run `npm run build` before E2E tests if Vite dev server is not running — stale assets in `public/build/` can cause test failures
 ---
 
 ## 2026-02-26 - US-001
@@ -163,4 +166,26 @@
   - Pre-existing test bugs: "Rapid Owl" text matched 3 elements (strict mode violation) — use `getByRole('heading', ...)` for unique matches
   - Playwright browsers must be installed separately via `npx playwright install chromium` — the `@playwright/test` npm package doesn't include them
   - The `APP_URL` env var (default: `http://how-does-that-work.test`) is used as `baseURL` in Playwright config — tests use relative URLs like `/dev/login-as/1`
+---
+
+## 2026-02-26 - US-010
+- What was implemented: Playwright navigation tests for the full game flow — 6 tests covering each step from lobby through round completion, plus host reconnection and guest redirect
+- Test cases:
+  1. **Host starts submission phase** — login as host-standard, navigate to lobby, click "Start Submission Phase", assert redirect to /submit
+  2. **Host submits topics** — login as host-submitting, fill 3 topics, submit, assert confirmation message on /submit
+  3. **Host starts game** — login as host-ready (all-submitted scenario), click "Start Game", assert redirect to /play
+  4. **Host advances turn** — login as host-grading-done, middleware redirects to results page, click "Next Player →", assert redirect to /play
+  5. **Host reconnects from dashboard** — login as host-choosing, click "Rejoin" link on dashboard, assert redirect to /play
+  6. **Guest sees correct screen on refresh** — join round_complete game via /dev/join-game, assert redirect to /round-complete; navigate to wrong URL, assert redirect back
+- Files changed:
+  - `tests/e2e/game-flow.spec.ts` (new) — 6 Playwright navigation tests covering the full game flow
+  - `database/seeders/DevSeeder.php` — replaced random game codes with deterministic codes (LOBBY1, PLAYNG, COMPLT, SUBMIT, READY1, CHOOSE, GRADED, RNDDNE) for test reliability; added 2 guest players to the lobby game so "Start Submission Phase" button is enabled
+  - `app/Http/Controllers/DevController.php` — fixed `joinGame()` session key bug: `player_id` → `player_id.{$code}` to match the session key format used by all game controllers
+- **Learnings for future iterations:**
+  - DevSeeder game codes must be deterministic for E2E tests — random codes make it impossible to reference games from test files without extracting them from the DOM
+  - The DevController `joinGame()` had a session key bug (`player_id` vs `player_id.{$code}`) that prevented guest players from being recognized by the RedirectToGameState middleware in E2E tests
+  - The lobby game scenario needs 2+ non-host players for the "Start Submission Phase" button to be enabled — ensure all seeded scenarios have the prerequisite state for the action being tested
+  - Stale Vite build artifacts can cause E2E test failures — if `npm run dev` is not running, the app serves from `public/build/` which may be outdated; run `npm run build` before E2E tests if assets have changed
+  - Deterministic user IDs after `migrate:fresh --seed`: test@example.com=1, then dev users 2-10 in creation order (host-loaded=2, host-standard=3, host-broke=4, host-veteran=5, host-submitting=6, host-ready=7, host-choosing=8, host-grading-done=9, host-round-done=10)
+  - Tests that modify game state (clicking "Start Game", "Advance Turn") are safe to run in parallel as long as each test uses a different seeded game — the deterministic code pattern ensures no conflicts
 ---
