@@ -89,8 +89,9 @@ class TopicController extends Controller
     {
         if ($request->user()) {
             $player = $game->players()->where('user_id', $request->user()->id)->first();
-
-            return [$player, $player?->is_host ?? false];
+            if ($player) {
+                return [$player, $player->is_host ?? false];
+            }
         }
 
         $playerId = $request->session()->get("player_id.{$game->code}");
