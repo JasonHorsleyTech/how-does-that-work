@@ -203,4 +203,56 @@ class GameController extends Controller
 
         return redirect("/games/{$game->code}/play");
     }
+
+    public function review(string $code, Request $request)
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        $player = $game->players()->where('user_id', $request->user()->id)->first();
+        if (! $player || ! $player->is_host) {
+            abort(403);
+        }
+
+        if ($game->status !== 'complete') {
+            return redirect("/games/{$game->code}/lobby");
+        }
+
+        $players = $game->players()
+            ->orderByDesc('score')
+            ->get(['id', 'name', 'score', 'is_host']);
+
+        $allTurns = $game->turns()
+            ->where('status', 'complete')
+            ->with(['player', 'topic'])
+            ->orderBy('round_number')
+            ->orderBy('turn_order')
+            ->get();
+
+        return Inertia::render('games/Review', [
+            'game' => [
+                'id' => $game->id,
+                'code' => $game->code,
+                'max_rounds' => $game->max_rounds,
+                'created_at' => $game->created_at->toIso8601String(),
+            ],
+            'players' => $players->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'score' => $p->score,
+                'is_host' => $p->is_host,
+            ]),
+            'allTurns' => $allTurns->map(fn ($t) => [
+                'id' => $t->id,
+                'player_id' => $t->player_id,
+                'player_name' => $t->player->name,
+                'topic_text' => $t->topic?->text,
+                'transcript' => $t->transcript,
+                'grade' => $t->grade,
+                'score' => $t->score,
+                'feedback' => $t->feedback,
+                'actual_explanation' => $t->actual_explanation,
+                'round_number' => $t->round_number,
+            ]),
+        ]);
+    }
 }

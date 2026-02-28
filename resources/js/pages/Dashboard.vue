@@ -180,6 +180,13 @@ function statusClass(status: string): string {
                                 >
                                     Rejoin
                                 </Link>
+                                <Link
+                                    v-else-if="game.status === 'complete'"
+                                    :href="`/games/${game.code}/review`"
+                                    class="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-xs font-medium text-foreground shadow-sm hover:bg-muted/80 transition-colors"
+                                >
+                                    Review
+                                </Link>
                             </td>
                         </tr>
                     </tbody>
