@@ -1,0 +1,127 @@
+{
+  "project": "Flow Improvements for New Player Legibility",
+  "description": "A collection of UX improvements to make the game less confusing for first-time hosts and players. Right now the game works, but new users hit friction points: unclear UI during recording/grading, Laravel boilerplate branding everywhere, the host can't actually play, invalid game codes blow up the page, and there's no way to review a finished game. These changes make the game feel like a real product instead of a dev prototype.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Remove host audio upload fallback from recording UI",
+      "description": "As a host, I should not see a confusing \"upload audio on behalf of player\" option during a player's recording turn, because it makes me think I'm supposed to do something when I'm not.",
+      "acceptanceCriteria": [
+        "The host audio upload button/form is completely removed from the Play page recording UI",
+        "The backend endpoint (host-upload-audio) can remain for now but the UI no longer links to it",
+        "Host sees the same \"waiting for player to record\" view as any other non-active player",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Add grading wait state with spinner and status text",
+      "description": "As a player who just finished recording, I want to see a clear indicator that my speech is being processed, so I'm not staring at a blank screen wondering if something broke.",
+      "acceptanceCriteria": [
+        "After audio upload completes, the active player (and all other players) see a spinner/loading state",
+        "Status text updates through the pipeline stages: \"Transcribing your speech...\" then \"Grading your explanation...\"",
+        "The backend play-state polling endpoint returns enough information to distinguish between transcription-in-progress and grading-in-progress (use the PipelineLog timestamps: whisper_sent_at set but whisper_response_at null = transcribing; gpt_sent_at set but gpt_response_at null = grading)",
+        "When grading completes, the UI transitions to the results view without requiring a manual refresh",
+        "If grading fails, show a user-friendly error message instead of hanging on the spinner forever",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true
+    },
+    {
+      "id": "US-003",
+      "title": "Allow host to play the game as a regular player",
+      "description": "As a host, I want to be assigned turns and record speeches just like every other player, so I can actually play the game I'm hosting — especially important in 2-player games where the host is the only other person.",
+      "acceptanceCriteria": [
+        "TurnAssignmentService::assignTurns() includes the host player when generating turns (currently filters to non-host players only)",
+        "Host is assigned topics they did not submit, same as other players",
+        "When it's the host's turn, they see the topic choice screen and then the recording UI on their device",
+        "Other players see the \"waiting\" screen while the host records",
+        "Host's speech is transcribed and graded identically to other players",
+        "Host accumulates score and appears on the leaderboard",
+        "The \"advance to next turn\" button still only appears for the host, but only AFTER their own turn's results are shown (not during their own turn)",
+        "A 2-player game (host + 1 guest) works correctly with both players getting turns",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true
+    },
+    {
+      "id": "US-004",
+      "title": "Add microphone permission explanation on join/lobby page",
+      "description": "As a new player joining a game, I want to understand why the game needs microphone access before I'm suddenly prompted by the browser, so I'm not caught off guard.",
+      "acceptanceCriteria": [
+        "On the join page (where the player enters their name), a short text block explains: \"This game needs your microphone because you'll be giving an impromptu speech. We'll ask for mic access when it's your turn.\"",
+        "The text appears before/above the name input, clearly visible without scrolling",
+        "The explanation is brief (1-2 sentences max), not a wall of text",
+        "The browser's native microphone permission prompt is NOT triggered on this page — it should still only be triggered when recording actually starts",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true
+    },
+    {
+      "id": "US-005",
+      "title": "Inline error for invalid game codes instead of 404 page",
+      "description": "As a player on the home page, if I enter an invalid game code and hit Join, I should see a friendly inline error instead of the entire page turning into a 404.",
+      "acceptanceCriteria": [
+        "When a user submits an invalid/nonexistent game code on the home page, the page does NOT navigate away",
+        "An inline error message appears near the Join button (e.g., red-bordered div saying \"We couldn't find a game with that code\")",
+        "The error disappears when the user starts typing a new code",
+        "The join form validates the code via an API call (e.g., GET /games/{code}/exists or similar) before navigating",
+        "Valid codes still navigate to the join/lobby page as before",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false
+    },
+    {
+      "id": "US-006",
+      "title": "Remove all Laravel Starter Kit branding",
+      "description": "As a user on any page of the app, I should not see any Laravel branding, GitHub links, documentation links, or \"starter kit\" language. The app should feel like its own product.",
+      "acceptanceCriteria": [
+        "No page anywhere in the app contains the text \"Laravel\" (except possibly in HTML meta generator tags or server headers, which users don't see)",
+        "No links to GitHub repos, Laravel documentation, or any framework docs appear in the UI",
+        "The navigation/header does not reference \"Laravel Starter Kit\" or similar",
+        "Any placeholder branding is replaced with the app name \"How Does That Work?\" or a neutral alternative",
+        "Footer links, if any, are relevant to the game (not framework boilerplate)",
+        "The login, register, and password reset pages are similarly cleaned up",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false
+    },
+    {
+      "id": "US-007",
+      "title": "Show credit balance on settings/profile page",
+      "description": "As a host, I want to see how many credits I have on my profile or settings page, so I know if I need to buy more before starting a game.",
+      "acceptanceCriteria": [
+        "The user's credit balance is displayed on the profile/settings page",
+        "The balance is clearly labeled (e.g., \"Credits: 12\" or \"Game Credits Remaining: 12\")",
+        "If credits are zero, the display makes this obvious (not just \"0\" buried in a corner)",
+        "Optionally: a link or button to purchase more credits is shown nearby",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false
+    },
+    {
+      "id": "US-008",
+      "title": "Game history review page for hosts",
+      "description": "As a host, after a game is complete, I want to be able to go back and review all the transcripts, grades, and feedback from that game, so I can relive the fun or share highlights.",
+      "acceptanceCriteria": [
+        "A new page exists at a route like /games/{code}/review (or similar)",
+        "Only the authenticated host of that game can access it (other players and unauthenticated users get a 403 or redirect)",
+        "The page displays every turn from every round: player name, topic, transcript of their speech, grade, score, and AI feedback",
+        "Turns are organized by round, in the order they were played",
+        "The page is accessible from a \"game history\" list somewhere in the host's authenticated area (e.g., dashboard or profile)",
+        "Completed games appear in a list with the game code, date played, and number of players",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false
+    }
+  ]
+}
