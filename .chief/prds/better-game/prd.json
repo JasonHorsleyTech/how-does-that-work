@@ -83,7 +83,7 @@
         "Player cumulative scores in the scoreboard handle decimal addition correctly"
       ],
       "priority": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-006",

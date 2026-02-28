@@ -26,7 +26,7 @@ class Player extends Model
         return [
             'is_host' => 'boolean',
             'has_submitted' => 'boolean',
-            'score' => 'integer',
+            'score' => 'float',
         ];
     }
 

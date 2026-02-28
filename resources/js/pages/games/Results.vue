@@ -5,6 +5,7 @@ import { computed, onMounted, onUnmounted } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
+import { formatScore } from '@/utils/formatScore';
 
 const props = defineProps<{
     game: {
@@ -176,7 +177,7 @@ onUnmounted(() => {
                                 Score
                             </p>
                             <p class="mt-1 text-4xl font-bold">
-                                {{ turn.score
+                                {{ formatScore(turn.score)
                                 }}<span class="text-xl text-muted-foreground"
                                     >/100</span
                                 >
@@ -236,7 +237,7 @@ onUnmounted(() => {
                                     >(host)</span
                                 >
                             </span>
-                            <span class="font-bold">{{ p.score }} pts</span>
+                            <span class="font-bold">{{ formatScore(p.score) }} pts</span>
                         </li>
                     </ol>
                 </div>
@@ -375,7 +376,7 @@ onUnmounted(() => {
                                 >(host)</span
                             >
                         </span>
-                        <span class="font-bold">{{ p.score }} pts</span>
+                        <span class="font-bold">{{ formatScore(p.score) }} pts</span>
                     </li>
                 </ol>
             </div>

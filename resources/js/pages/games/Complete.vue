@@ -4,6 +4,7 @@ import { Head, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
+import { formatScore } from '@/utils/formatScore';
 
 const props = defineProps<{
     game: {
@@ -87,7 +88,7 @@ function turnsForPlayer(playerId: number) {
                 >
                     <p class="text-4xl">🏆</p>
                     <h1 class="mt-2 text-3xl font-bold tracking-tight">
-                        {{ winner.name }} wins with {{ winner.score }} points!
+                        {{ winner.name }} wins with {{ formatScore(winner.score) }} points!
                     </h1>
                     <p class="mt-1 text-sm text-muted-foreground">Game Over</p>
                 </div>
@@ -127,7 +128,7 @@ function turnsForPlayer(playerId: number) {
                                     >(host)</span
                                 >
                             </span>
-                            <span class="font-bold">{{ p.score }} pts</span>
+                            <span class="font-bold">{{ formatScore(p.score) }} pts</span>
                         </li>
                     </ol>
                 </div>
@@ -169,7 +170,7 @@ function turnsForPlayer(playerId: number) {
                                             >—</span
                                         >
                                         <span class="font-bold"
-                                            >{{ turn.score ?? 0 }} pts</span
+                                            >{{ formatScore(turn.score) }} pts</span
                                         >
                                     </div>
                                 </div>
@@ -212,7 +213,7 @@ function turnsForPlayer(playerId: number) {
             >
                 <p class="text-4xl">🏆</p>
                 <h1 class="mt-2 text-3xl font-bold tracking-tight">
-                    {{ winner.name }} wins with {{ winner.score }} points!
+                    {{ winner.name }} wins with {{ formatScore(winner.score) }} points!
                 </h1>
                 <p class="mt-1 text-sm text-muted-foreground">Game Over</p>
             </div>
@@ -250,7 +251,7 @@ function turnsForPlayer(playerId: number) {
                                 >(host)</span
                             >
                         </span>
-                        <span class="font-bold">{{ p.score }} pts</span>
+                        <span class="font-bold">{{ formatScore(p.score) }} pts</span>
                     </li>
                 </ol>
             </div>

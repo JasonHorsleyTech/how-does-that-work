@@ -14,6 +14,9 @@
 - When passing a variable to a child component as a prop, it must be a `ref` — convert `let` variables to `ref()` if needed
 - Grading jokes live in `resources/js/utils/gradingJokes.ts` — easy to expand by adding strings to the array
 - Fade transitions: use CSS `transition-opacity duration-300` with a reactive `opacity-0`/`opacity-100` class toggle + `setTimeout` for the content swap
+- Score display: use `formatScore()` from `resources/js/utils/formatScore.ts` for consistent decimal display (e.g., "72.5")
+- Grade derivation: `GradeTurn::gradeFromScore()` derives letter grades server-side (A: 90+, B: 80-89.9, C: 70-79.9, D: 60-69.9, F: <60)
+- Score fields are `decimal` in DB, cast to `'float'` in models — use `round(..., 1)` when storing
 
 ---
 
@@ -77,4 +80,24 @@
   - CSS opacity transitions + `setTimeout` for content swap is a clean approach for cycling text — no need for Vue `<Transition>` component
   - Starting at a random index (`Math.floor(Math.random() * length)`) adds variety without complexity
   - The `recordingPhase === 'done'` state in Play.vue is the active player's grading wait screen — polling detects `grading_complete` and navigates away
+---
+
+## 2026-02-27 - US-005
+- Rewrote the GPT grading prompt for dry roast tone, varied scoring, and decimal precision
+- Created migration `2026_02_27_000002_change_scores_to_decimal.php` to change `turns.score` to `decimal(5,1)` and `players.score` to `decimal(6,1)`
+- Updated Turn model cast from `'integer'` to `'float'` and Player model cast from `'integer'` to `'float'`
+- Prompt now instructs GPT to use full 0-100 range with decimals, quote player's words, and write dry roast feedback
+- Grade is now derived server-side via `GradeTurn::gradeFromScore()` (A: 90+, B: 80-89.9, C: 70-79.9, D: 60-69.9, F: <60) instead of trusting GPT
+- No longer require `grade` key from GPT response — only `score`, `feedback`, and `actual_explanation`
+- Created `resources/js/utils/formatScore.ts` utility for consistent decimal display (`toFixed(1)`)
+- Updated Results.vue, Complete.vue, and RoundComplete.vue to use `formatScore()` for all score displays
+- Updated GradeTurnTest.php: all tests use decimal scores, added `gradeFromScore` unit test
+- Files changed: `app/Jobs/GradeTurn.php`, `app/Models/Turn.php`, `app/Models/Player.php`, `database/migrations/2026_02_27_000002_change_scores_to_decimal.php` (new), `resources/js/utils/formatScore.ts` (new), `resources/js/pages/games/Results.vue`, `resources/js/pages/games/Complete.vue`, `resources/js/pages/games/RoundComplete.vue`, `tests/Feature/GradeTurnTest.php`, `.chief/prds/better-game/prd.json`
+- **Learnings for future iterations:**
+  - Deriving grade server-side from score is more reliable than trusting GPT to be consistent with grade/score mapping
+  - `round(max(0, min(100, (float) $value)), 1)` is the correct way to clamp + round a decimal score
+  - Laravel `decimal(5,1)` supports up to 9999.9 — more than enough for 0-100.0 range. Use `decimal(6,1)` for cumulative player scores
+  - When changing column types, use `->change()` in migrations with doctrine/dbal
+  - `formatScore` utility with `toFixed(1)` ensures consistent "72.5" display rather than "72" or "72.50"
+  - Pre-existing BillingTest Stripe webhook failures (4 tests) are unrelated to game logic — ignore when validating changes
 ---
