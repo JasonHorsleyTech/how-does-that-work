@@ -145,7 +145,7 @@
         "Test verifies success feedback or that submission count updates"
       ],
       "priority": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-011",
