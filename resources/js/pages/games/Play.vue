@@ -100,6 +100,31 @@ let mediaRecorder: MediaRecorder | null = null;
 const recordingStream = ref<MediaStream | null>(null);
 let audioChunks: Blob[] = [];
 
+// Grading pipeline stage (from polling)
+const gradingStage = ref<'transcribing' | 'grading' | 'failed' | null>(null);
+
+const gradingStatusText = computed(() => {
+    const isMe = props.isActivePlayer;
+    switch (gradingStage.value) {
+        case 'transcribing':
+            return isMe
+                ? 'Transcribing your speech…'
+                : `Transcribing ${revealPlayerName.value}'s speech…`;
+        case 'grading':
+            return isMe
+                ? 'Grading your explanation…'
+                : `Grading ${revealPlayerName.value}'s explanation…`;
+        case 'failed':
+            return isMe
+                ? 'Something went wrong while processing your speech.'
+                : `Something went wrong while processing ${revealPlayerName.value}'s speech.`;
+        default:
+            return isMe
+                ? 'Processing your speech…'
+                : `Processing ${revealPlayerName.value}'s speech…`;
+    }
+});
+
 // Grading jokes rotation
 const currentJokeIndex = ref(0);
 const jokeVisible = ref(true);
@@ -394,6 +419,9 @@ async function pollState() {
                 return;
             }
 
+            // Update grading pipeline stage
+            gradingStage.value = data.gradingStage ?? null;
+
             if (
                 data.turnStatus === 'recording' &&
                 localTurnStatus.value === 'choosing'
@@ -406,6 +434,24 @@ async function pollState() {
                 );
             } else if (data.turnStatus !== localTurnStatus.value) {
                 localTurnStatus.value = data.turnStatus;
+            }
+
+            // Track player name for grading display
+            if (data.chosenTopicPlayerName) {
+                revealPlayerName.value = data.chosenTopicPlayerName;
+            }
+
+            // Start joke rotation when entering grading state
+            if (
+                (data.turnStatus === 'grading') &&
+                !jokeInterval
+            ) {
+                startJokeRotation();
+            }
+
+            // Stop joke rotation on failure
+            if (data.turnStatus === 'grading_failed') {
+                stopJokeRotation();
             }
 
             // Detect when active player starts recording
@@ -535,6 +581,38 @@ async function pollState() {
                         {{ revealPlayerName }} is checking their microphone…
                     </p>
                     <p class="mt-2 text-muted-foreground">Almost time!</p>
+                </div>
+
+                <!-- Grading in progress (host observing) -->
+                <div
+                    v-else-if="localTurnStatus === 'grading'"
+                    class="rounded-xl border p-8 text-center"
+                >
+                    <div class="flex justify-center mb-4">
+                        <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary/30 border-t-primary"></div>
+                    </div>
+                    <p class="text-lg font-semibold">
+                        {{ gradingStatusText }}
+                    </p>
+                    <p
+                        class="mt-4 text-sm text-muted-foreground transition-opacity duration-300"
+                        :class="jokeVisible ? 'opacity-100' : 'opacity-0'"
+                    >
+                        {{ gradingJokes[currentJokeIndex] }}
+                    </p>
+                </div>
+
+                <!-- Grading failed (host observing) -->
+                <div
+                    v-else-if="localTurnStatus === 'grading_failed'"
+                    class="rounded-xl border border-destructive/50 p-8 text-center"
+                >
+                    <p class="text-lg font-semibold text-destructive">
+                        Grading Failed
+                    </p>
+                    <p class="mt-2 text-muted-foreground">
+                        {{ gradingStatusText }}
+                    </p>
                 </div>
 
                 <JoinLinkPanel :game-code="game.code" />
@@ -683,7 +761,7 @@ async function pollState() {
                 <p class="mt-2 text-muted-foreground">Hang tight!</p>
             </div>
 
-            <!-- Active player: done / grading -->
+            <!-- Active player: done / grading (before first poll updates localTurnStatus) -->
             <div
                 v-else-if="
                     localTurnStatus === 'recording' &&
@@ -692,7 +770,10 @@ async function pollState() {
                 "
                 class="rounded-xl border p-8 text-center"
             >
-                <p class="text-lg font-semibold">Great job!</p>
+                <div class="flex justify-center mb-4">
+                    <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary/30 border-t-primary"></div>
+                </div>
+                <p class="text-lg font-semibold">Processing your speech…</p>
                 <p
                     class="mt-4 text-sm text-muted-foreground transition-opacity duration-300"
                     :class="jokeVisible ? 'opacity-100' : 'opacity-0'"
@@ -840,6 +921,42 @@ async function pollState() {
                     {{ revealPlayerName }} is checking their microphone…
                 </p>
                 <p class="mt-2 text-muted-foreground">Almost time!</p>
+            </div>
+
+            <!-- Grading in progress -->
+            <div
+                v-else-if="localTurnStatus === 'grading'"
+                class="rounded-xl border p-8 text-center"
+            >
+                <div class="flex justify-center mb-4">
+                    <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary/30 border-t-primary"></div>
+                </div>
+                <p class="text-lg font-semibold">
+                    {{ gradingStatusText }}
+                </p>
+                <p
+                    v-if="isActivePlayer"
+                    class="mt-4 text-sm text-muted-foreground transition-opacity duration-300"
+                    :class="jokeVisible ? 'opacity-100' : 'opacity-0'"
+                >
+                    {{ gradingJokes[currentJokeIndex] }}
+                </p>
+                <p v-else class="mt-2 text-sm text-muted-foreground">
+                    Hang tight while we process the results…
+                </p>
+            </div>
+
+            <!-- Grading failed -->
+            <div
+                v-else-if="localTurnStatus === 'grading_failed'"
+                class="rounded-xl border border-destructive/50 p-8 text-center"
+            >
+                <p class="text-lg font-semibold text-destructive">
+                    Grading Failed
+                </p>
+                <p class="mt-2 text-muted-foreground">
+                    {{ gradingStatusText }}
+                </p>
             </div>
         </div>
     </div>
