@@ -75,8 +75,7 @@ function fakeChatResponse(array $fields): void
 
 test('GradeTurn job stores all grading fields on the turn', function () {
     fakeChatResponse([
-        'score' => 80,
-        'grade' => 'B',
+        'score' => 72.5,
         'feedback' => 'Good explanation of the basic mechanism. You covered the key points accurately.',
         'actual_explanation' => 'A zipper works by using two rows of interlocking teeth joined by a slider.',
     ]);
@@ -87,17 +86,16 @@ test('GradeTurn job stores all grading fields on the turn', function () {
     $job->handle();
 
     $freshTurn = $turn->fresh();
-    expect($freshTurn->score)->toBe(80);
-    expect($freshTurn->grade)->toBe('B');
+    expect($freshTurn->score)->toBe(72.5);
+    expect($freshTurn->grade)->toBe('C');
     expect($freshTurn->feedback)->toContain('Good explanation');
     expect($freshTurn->actual_explanation)->toContain('zipper');
     expect($freshTurn->status)->toBe('complete');
 });
 
-test('GradeTurn job increments player score', function () {
+test('GradeTurn job increments player score with decimal values', function () {
     fakeChatResponse([
-        'score' => 75,
-        'grade' => 'C',
+        'score' => 45.5,
         'feedback' => 'Decent attempt.',
         'actual_explanation' => 'A zipper works by interlocking teeth.',
     ]);
@@ -107,31 +105,29 @@ test('GradeTurn job increments player score', function () {
     $job = new GradeTurn($turn);
     $job->handle();
 
-    expect($guestPlayer->fresh()->score)->toBe(75);
+    expect($guestPlayer->fresh()->score)->toBe(45.5);
 });
 
 test('GradeTurn job increments player score on top of existing score', function () {
     fakeChatResponse([
-        'score' => 50,
-        'grade' => 'C',
+        'score' => 34.5,
         'feedback' => 'Partial explanation.',
         'actual_explanation' => 'A zipper works by interlocking teeth.',
     ]);
 
     ['turn' => $turn, 'guestPlayer' => $guestPlayer] = buildGradeTurnFixture();
 
-    $guestPlayer->update(['score' => 30]);
+    $guestPlayer->update(['score' => 30.5]);
 
     $job = new GradeTurn($turn);
     $job->handle();
 
-    expect($guestPlayer->fresh()->score)->toBe(80);
+    expect($guestPlayer->fresh()->score)->toBe(65.0);
 });
 
 test('GradeTurn job sets game status to grading_complete', function () {
     fakeChatResponse([
-        'score' => 60,
-        'grade' => 'D',
+        'score' => 28.5,
         'feedback' => 'Missed most key points.',
         'actual_explanation' => 'A zipper works by interlocking teeth.',
     ]);
@@ -199,8 +195,7 @@ test('GradeTurn failed() sets turn status to grading_failed', function () {
 
 test('GradeTurn job clamps score to 0-100 range', function () {
     fakeChatResponse([
-        'score' => 150,
-        'grade' => 'A',
+        'score' => 150.5,
         'feedback' => 'Perfect.',
         'actual_explanation' => 'A zipper works by interlocking teeth.',
     ]);
@@ -210,6 +205,19 @@ test('GradeTurn job clamps score to 0-100 range', function () {
     $job = new GradeTurn($turn);
     $job->handle();
 
-    expect($turn->fresh()->score)->toBe(100);
-    expect($guestPlayer->fresh()->score)->toBe(100);
+    expect($turn->fresh()->score)->toBe(100.0);
+    expect($guestPlayer->fresh()->score)->toBe(100.0);
+});
+
+test('GradeTurn derives correct grade from score', function () {
+    expect(GradeTurn::gradeFromScore(95.5))->toBe('A');
+    expect(GradeTurn::gradeFromScore(90.0))->toBe('A');
+    expect(GradeTurn::gradeFromScore(85.0))->toBe('B');
+    expect(GradeTurn::gradeFromScore(80.0))->toBe('B');
+    expect(GradeTurn::gradeFromScore(75.0))->toBe('C');
+    expect(GradeTurn::gradeFromScore(70.0))->toBe('C');
+    expect(GradeTurn::gradeFromScore(65.0))->toBe('D');
+    expect(GradeTurn::gradeFromScore(60.0))->toBe('D');
+    expect(GradeTurn::gradeFromScore(59.9))->toBe('F');
+    expect(GradeTurn::gradeFromScore(0.0))->toBe('F');
 });

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\TranscribeAudio;
 use App\Models\Game;
+use App\Models\PipelineLog;
 use App\Models\Topic;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -362,7 +363,8 @@ class TurnController extends Controller
             'audio' => ['required', 'file'],
         ]);
 
-        $path = $request->file('audio')->storeAs(
+        $audioFile = $request->file('audio');
+        $path = $audioFile->storeAs(
             "audio/{$game->code}",
             "{$turnId}.webm",
             'local'
@@ -374,8 +376,74 @@ class TurnController extends Controller
             'completed_at' => now(),
         ]);
 
+        PipelineLog::create([
+            'turn_id' => $turn->id,
+            'status' => 'audio_received',
+            'audio_received_at' => now(),
+            'audio_file_path' => $path,
+            'audio_file_size_bytes' => $audioFile->getSize(),
+        ]);
+
         $game->update(['state_updated_at' => now()]);
         $player->touch();
+
+        dispatch(new TranscribeAudio($turn));
+
+        return response()->json(['status' => 'grading']);
+    }
+
+    public function hostUploadAudio(string $code, int $turnId, Request $request): JsonResponse
+    {
+        $game = Game::where('code', strtoupper($code))->firstOrFail();
+
+        [$player, $isHost] = $this->resolvePlayer($game, $request);
+
+        if (! $player || ! $isHost) {
+            abort(403);
+        }
+
+        $turn = $game->turns()->where('id', $turnId)->firstOrFail();
+
+        if (! in_array($turn->status, ['choosing', 'recording'])) {
+            return response()->json(['error' => 'Turn is not in an active state.'], 422);
+        }
+
+        $request->validate([
+            'audio' => ['required', 'file', 'mimes:mp3,wav,webm,m4a,ogg,mpga'],
+        ]);
+
+        // If the turn is still in 'choosing' and no topic was picked, auto-select the first topic
+        if ($turn->status === 'choosing' && ! $turn->topic_id && $turn->topic_choices) {
+            $firstTopicId = $turn->topic_choices[0];
+            Topic::where('id', $firstTopicId)->update(['is_used' => true]);
+            $turn->update(['topic_id' => $firstTopicId]);
+        }
+
+        $audioFile = $request->file('audio');
+        $extension = $audioFile->getClientOriginalExtension() ?: 'webm';
+        $path = $audioFile->storeAs(
+            "audio/{$game->code}",
+            "{$turnId}.{$extension}",
+            'local'
+        );
+
+        $turn->update([
+            'audio_path' => $path,
+            'status' => 'grading',
+            'started_at' => $turn->started_at ?? now(),
+            'completed_at' => now(),
+        ]);
+
+        PipelineLog::create([
+            'turn_id' => $turn->id,
+            'status' => 'audio_received',
+            'audio_received_at' => now(),
+            'audio_file_path' => $path,
+            'audio_file_size_bytes' => $audioFile->getSize(),
+        ]);
+
+        $game->update(['state_updated_at' => now()]);
+        $turn->player->touch();
 
         dispatch(new TranscribeAudio($turn));
 

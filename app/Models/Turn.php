@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Turn extends Model
 {
@@ -34,7 +35,7 @@ class Turn extends Model
             'topic_choices' => 'array',
             'round_number' => 'integer',
             'turn_order' => 'integer',
-            'score' => 'integer',
+            'score' => 'float',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
@@ -53,5 +54,10 @@ class Turn extends Model
     public function topic(): BelongsTo
     {
         return $this->belongsTo(Topic::class);
+    }
+
+    public function pipelineLog(): HasOne
+    {
+        return $this->hasOne(PipelineLog::class);
     }
 }

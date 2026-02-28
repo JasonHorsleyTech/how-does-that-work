@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\ApiUsageLog;
+use App\Models\PipelineLog;
 use App\Models\Turn;
 use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -21,9 +22,10 @@ class TranscribeAudio implements ShouldQueue
     public function handle(): void
     {
         $audioPath = $this->turn->audio_path;
+        $pipelineLog = PipelineLog::where('turn_id', $this->turn->id)->first();
 
         if (! $audioPath || ! Storage::disk('local')->exists($audioPath)) {
-            $this->markFailed('Audio file not found.');
+            $this->markFailed('Audio file not found.', $pipelineLog);
 
             return;
         }
@@ -32,13 +34,18 @@ class TranscribeAudio implements ShouldQueue
         $host = User::find($this->turn->game->host_user_id);
 
         if (! $host || $host->credits <= 0) {
-            $this->markFailed('Host ran out of credits.');
+            $this->markFailed('Host ran out of credits.', $pipelineLog);
 
             return;
         }
 
         try {
             $stream = Storage::disk('local')->readStream($audioPath);
+
+            $pipelineLog?->update([
+                'status' => 'whisper_sending',
+                'whisper_sent_at' => now(),
+            ]);
 
             $response = OpenAI::audio()->transcribe([
                 'model' => 'whisper-1',
@@ -47,11 +54,18 @@ class TranscribeAudio implements ShouldQueue
 
             $transcript = trim($response->text ?? '');
 
+            $pipelineLog?->update([
+                'whisper_response_at' => now(),
+                'whisper_transcript' => $transcript,
+            ]);
+
             if ($transcript === '') {
-                $this->markFailed('Whisper returned an empty transcript.');
+                $this->markFailed('Whisper returned an empty transcript.', $pipelineLog, 'Whisper returned an empty transcript.');
 
                 return;
             }
+
+            $pipelineLog?->update(['status' => 'whisper_complete']);
 
             $this->turn->update(['transcript' => $transcript]);
 
@@ -68,15 +82,22 @@ class TranscribeAudio implements ShouldQueue
             dispatch(new GradeTurn($this->turn));
         } catch (Throwable $e) {
             Log::error('TranscribeAudio failed', ['turn_id' => $this->turn->id, 'error' => $e->getMessage()]);
-            $this->markFailed('Transcription error: '.$e->getMessage());
+            $this->markFailed('Transcription error: '.$e->getMessage(), $pipelineLog, $e->getMessage());
         }
     }
 
-    private function markFailed(string $message): void
+    private function markFailed(string $message, ?PipelineLog $pipelineLog, ?string $whisperError = null): void
     {
         $this->turn->update([
             'status' => 'grading_failed',
             'transcript' => $message,
+        ]);
+
+        $pipelineLog?->update([
+            'status' => 'whisper_failed',
+            'whisper_error' => $whisperError ?? $message,
+            'whisper_response_at' => $pipelineLog->whisper_sent_at ? now() : null,
+            'error_message' => $message,
         ]);
     }
 }

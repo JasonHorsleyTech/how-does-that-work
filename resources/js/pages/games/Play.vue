@@ -2,6 +2,7 @@
 import { Head, useForm } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
+import AudioVisualizer from '@/components/AudioVisualizer.vue';
 import JoinLinkPanel from '@/components/JoinLinkPanel.vue';
 import PollIndicator from '@/components/PollIndicator.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -12,6 +13,7 @@ import {
     createCountdownTimer,
     type CountdownTimer,
 } from '@/utils/countdownTimer';
+import { gradingJokes } from '@/utils/gradingJokes';
 
 const props = defineProps<{
     game: {
@@ -95,8 +97,89 @@ let micCheckInterval: ReturnType<typeof setInterval> | null = null;
 let activeRecordingTimer: CountdownTimer | null = null;
 let nonActiveRecordingTimer: CountdownTimer | null = null;
 let mediaRecorder: MediaRecorder | null = null;
-let recordingStream: MediaStream | null = null;
+const recordingStream = ref<MediaStream | null>(null);
 let audioChunks: Blob[] = [];
+
+// Grading jokes rotation
+const currentJokeIndex = ref(0);
+const jokeVisible = ref(true);
+let jokeInterval: ReturnType<typeof setInterval> | null = null;
+
+function startJokeRotation() {
+    if (jokeInterval) return;
+    currentJokeIndex.value = Math.floor(Math.random() * gradingJokes.length);
+    jokeVisible.value = true;
+    jokeInterval = setInterval(() => {
+        jokeVisible.value = false;
+        setTimeout(() => {
+            currentJokeIndex.value =
+                (currentJokeIndex.value + 1) % gradingJokes.length;
+            jokeVisible.value = true;
+        }, 400);
+    }, 4500);
+}
+
+function stopJokeRotation() {
+    if (jokeInterval) {
+        clearInterval(jokeInterval);
+        jokeInterval = null;
+    }
+}
+
+// Host audio upload fallback
+const hostUploadInput = ref<HTMLInputElement | null>(null);
+const hostUploadPhase = ref<'idle' | 'uploading' | 'error'>('idle');
+const hostUploadError = ref('');
+
+function triggerHostUpload() {
+    hostUploadInput.value?.click();
+}
+
+async function handleHostFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !props.currentTurn) return;
+
+    hostUploadPhase.value = 'uploading';
+    hostUploadError.value = '';
+
+    const formData = new FormData();
+    formData.append('audio', file);
+
+    try {
+        const response = await fetch(
+            `/api/games/${props.game.code}/turns/${props.currentTurn.id}/host-upload-audio`,
+            {
+                method: 'POST',
+                headers: {
+                    'X-XSRF-TOKEN': getCsrfToken(),
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: formData,
+            },
+        );
+
+        if (response.ok) {
+            hostUploadPhase.value = 'idle';
+            // Start polling to detect grading completion
+            if (!pollInterval) {
+                pollInterval = setInterval(pollState, 3000);
+            }
+        } else {
+            const data = await response.json().catch(() => ({}));
+            hostUploadPhase.value = 'error';
+            hostUploadError.value =
+                data.message || data.error || 'Upload failed.';
+        }
+    } catch {
+        hostUploadPhase.value = 'error';
+        hostUploadError.value = 'Network error. Please try again.';
+    }
+
+    // Reset file input so the same file can be re-selected
+    input.value = '';
+}
 
 function getCsrfToken(): string {
     const match = document.cookie
@@ -199,7 +282,7 @@ async function startMyTurn() {
 
     // Attempt to start MediaRecorder
     try {
-        recordingStream = await navigator.mediaDevices.getUserMedia({
+        recordingStream.value = await navigator.mediaDevices.getUserMedia({
             audio: true,
             video: false,
         });
@@ -208,7 +291,7 @@ async function startMyTurn() {
             ? 'audio/webm'
             : '';
         mediaRecorder = new MediaRecorder(
-            recordingStream,
+            recordingStream.value,
             mimeType ? { mimeType } : undefined,
         );
         mediaRecorder.ondataavailable = (e) => {
@@ -249,9 +332,9 @@ async function stopAndUploadRecording() {
         });
     }
 
-    if (recordingStream) {
-        recordingStream.getTracks().forEach((t) => t.stop());
-        recordingStream = null;
+    if (recordingStream.value) {
+        recordingStream.value.getTracks().forEach((t) => t.stop());
+        recordingStream.value = null;
     }
 
     recordingPhase.value = 'uploading';
@@ -313,10 +396,20 @@ onUnmounted(() => {
     if (countdownTimer) clearInterval(countdownTimer);
     if (nonActiveRecordingTimer) nonActiveRecordingTimer.stop();
     stopMicStream();
+    stopJokeRotation();
     if (activeRecordingTimer) activeRecordingTimer.stop();
     if (mediaRecorder && mediaRecorder.state !== 'inactive')
         mediaRecorder.stop();
-    if (recordingStream) recordingStream.getTracks().forEach((t) => t.stop());
+    if (recordingStream.value) recordingStream.value.getTracks().forEach((t) => t.stop());
+});
+
+// Start joke rotation when grading begins
+watch(recordingPhase, (phase) => {
+    if (phase === 'done') {
+        startJokeRotation();
+    } else {
+        stopJokeRotation();
+    }
 });
 
 // Handle in-page transition from choosing → recording (Inertia SPA update)
@@ -468,6 +561,37 @@ async function pollState() {
                     <p class="mt-2 text-muted-foreground">
                         Waiting for them to pick.
                     </p>
+
+                    <!-- Host upload fallback -->
+                    <div class="mt-4 border-t pt-4">
+                        <input
+                            ref="hostUploadInput"
+                            type="file"
+                            accept=".mp3,.wav,.webm,.m4a,.ogg"
+                            class="hidden"
+                            @change="handleHostFileSelected"
+                        />
+                        <button
+                            v-if="hostUploadPhase !== 'uploading'"
+                            type="button"
+                            class="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                            @click="triggerHostUpload"
+                        >
+                            Upload Audio for {{ currentTurn.player_name }}
+                        </button>
+                        <p
+                            v-else
+                            class="text-sm text-muted-foreground"
+                        >
+                            Uploading…
+                        </p>
+                        <p
+                            v-if="hostUploadPhase === 'error'"
+                            class="mt-2 text-sm text-destructive"
+                        >
+                            {{ hostUploadError }}
+                        </p>
+                    </div>
                 </div>
 
                 <!-- Active player is explaining (host view) -->
@@ -486,6 +610,37 @@ async function pollState() {
                         {{ nonActiveTimeDisplay }}
                     </p>
                     <p class="mt-1 text-sm text-muted-foreground">remaining</p>
+
+                    <!-- Host upload fallback -->
+                    <div class="mt-4 border-t pt-4">
+                        <input
+                            ref="hostUploadInput"
+                            type="file"
+                            accept=".mp3,.wav,.webm,.m4a,.ogg"
+                            class="hidden"
+                            @change="handleHostFileSelected"
+                        />
+                        <button
+                            v-if="hostUploadPhase !== 'uploading'"
+                            type="button"
+                            class="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                            @click="triggerHostUpload"
+                        >
+                            Upload Audio for {{ revealPlayerName }}
+                        </button>
+                        <p
+                            v-else
+                            class="text-sm text-muted-foreground"
+                        >
+                            Uploading…
+                        </p>
+                        <p
+                            v-if="hostUploadPhase === 'error'"
+                            class="mt-2 text-sm text-destructive"
+                        >
+                            {{ hostUploadError }}
+                        </p>
+                    </div>
                 </div>
 
                 <!-- Active player is checking their microphone -->
@@ -497,6 +652,37 @@ async function pollState() {
                         {{ revealPlayerName }} is checking their microphone…
                     </p>
                     <p class="mt-2 text-muted-foreground">Almost time!</p>
+
+                    <!-- Host upload fallback -->
+                    <div class="mt-4 border-t pt-4">
+                        <input
+                            ref="hostUploadInput"
+                            type="file"
+                            accept=".mp3,.wav,.webm,.m4a,.ogg"
+                            class="hidden"
+                            @change="handleHostFileSelected"
+                        />
+                        <button
+                            v-if="hostUploadPhase !== 'uploading'"
+                            type="button"
+                            class="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                            @click="triggerHostUpload"
+                        >
+                            Upload Audio for {{ revealPlayerName }}
+                        </button>
+                        <p
+                            v-else
+                            class="text-sm text-muted-foreground"
+                        >
+                            Uploading…
+                        </p>
+                        <p
+                            v-if="hostUploadPhase === 'error'"
+                            class="mt-2 text-sm text-destructive"
+                        >
+                            {{ hostUploadError }}
+                        </p>
+                    </div>
                 </div>
 
                 <JoinLinkPanel :game-code="game.code" />
@@ -591,6 +777,12 @@ async function pollState() {
                     </p>
                 </div>
 
+                <!-- Audio visualizer -->
+                <AudioVisualizer
+                    v-if="recordingStream"
+                    :stream="recordingStream"
+                />
+
                 <!-- Timer -->
                 <div class="text-center">
                     <p
@@ -649,8 +841,11 @@ async function pollState() {
                 class="rounded-xl border p-8 text-center"
             >
                 <p class="text-lg font-semibold">Great job!</p>
-                <p class="mt-2 text-muted-foreground">
-                    Your explanation is being graded…
+                <p
+                    class="mt-4 text-sm text-muted-foreground transition-opacity duration-300"
+                    :class="jokeVisible ? 'opacity-100' : 'opacity-0'"
+                >
+                    {{ gradingJokes[currentJokeIndex] }}
                 </p>
             </div>
 

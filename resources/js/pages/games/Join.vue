@@ -13,12 +13,32 @@ const props = defineProps<{
 }>();
 
 const reconnecting = ref(false);
+const micDenied = ref(false);
 
 const form = useForm({
     name: props.suggestedName ?? '',
 });
 
-function submit() {
+async function submit() {
+    if (micDenied.value) {
+        // User already saw the warning and is clicking "Join Anyway"
+        form.post(`/join/${props.game.code}`);
+        return;
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: false,
+        });
+        // Permission granted — release the stream immediately
+        stream.getTracks().forEach((track) => track.stop());
+    } catch {
+        // Permission denied or device unavailable — show warning but allow joining
+        micDenied.value = true;
+        return;
+    }
+
     form.post(`/join/${props.game.code}`);
 }
 
@@ -118,8 +138,22 @@ onMounted(async () => {
                 </p>
             </div>
 
+            <p
+                v-if="micDenied"
+                class="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+            >
+                Microphone access was denied. You can still play, but the
+                host may need to upload audio on your behalf.
+            </p>
+
             <Button type="submit" class="w-full" :disabled="form.processing">
-                {{ form.processing ? 'Joining…' : 'Join Game' }}
+                {{
+                    form.processing
+                        ? 'Joining…'
+                        : micDenied
+                          ? 'Join Anyway'
+                          : 'Join Game'
+                }}
             </Button>
         </form>
     </AuthBase>
