@@ -29,6 +29,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('billing', [BillingController::class, 'index'])->name('billing');
     Route::post('billing/checkout', [BillingController::class, 'checkout'])->name('billing.checkout');
     Route::get('billing/success', [BillingController::class, 'success'])->name('billing.success');
+
+    Route::get('games/{code}/review', [GameController::class, 'review'])->name('games.review');
 });
 
 // Stripe webhook — no CSRF, no auth
@@ -45,6 +47,7 @@ Route::middleware([RedirectToGameState::class])->group(function () {
 });
 
 // Game polling/API endpoints — no redirect middleware
+Route::get('games/{code}/exists', [GameController::class, 'exists'])->name('games.exists');
 Route::get('games/{code}/players', [GameController::class, 'players'])->name('games.players');
 Route::get('games/{code}/submission-status', [GameController::class, 'submissionStatus'])->name('games.submission-status');
 Route::get('games/{code}/play-state', [TurnController::class, 'playState'])->name('games.play-state');

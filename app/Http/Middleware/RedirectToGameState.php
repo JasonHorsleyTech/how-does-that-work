@@ -51,8 +51,8 @@ class RedirectToGameState
 
     private function isParticipant(Game $game, Request $request): bool
     {
-        if ($request->user()) {
-            return $game->players()->where('user_id', $request->user()->id)->exists();
+        if ($request->user() && $game->players()->where('user_id', $request->user()->id)->exists()) {
+            return true;
         }
 
         $playerId = $request->session()->get("player_id.{$game->code}");

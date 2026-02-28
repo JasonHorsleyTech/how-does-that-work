@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { dashboard, login, register } from '@/routes';
@@ -15,11 +15,33 @@ withDefaults(
 );
 
 const joinCode = ref('');
+const joinError = ref('');
+const joinLoading = ref(false);
 
-function handleJoin() {
+watch(joinCode, () => {
+    joinError.value = '';
+});
+
+async function handleJoin() {
     const code = joinCode.value.trim().toUpperCase();
-    if (code) {
-        router.visit(`/join/${code}`);
+    if (!code) return;
+
+    joinLoading.value = true;
+    joinError.value = '';
+
+    try {
+        const response = await fetch(`/games/${code}/exists`);
+        const data = await response.json();
+
+        if (data.exists) {
+            router.visit(`/join/${code}`);
+        } else {
+            joinError.value = "We couldn't find a game with that code";
+        }
+    } catch {
+        joinError.value = 'Something went wrong. Please try again.';
+    } finally {
+        joinLoading.value = false;
     }
 }
 </script>
@@ -80,17 +102,31 @@ function handleJoin() {
                     </template>
 
                     <!-- Join a Game -->
-                    <div class="flex w-full gap-2 sm:w-auto">
-                        <Input
-                            v-model="joinCode"
-                            placeholder="Game code"
-                            maxlength="6"
-                            class="w-full uppercase sm:w-32"
-                            @keyup.enter="handleJoin"
-                        />
-                        <Button variant="outline" size="lg" @click="handleJoin">
-                            Join
-                        </Button>
+                    <div class="flex flex-col items-center sm:items-start">
+                        <div class="flex w-full gap-2 sm:w-auto">
+                            <Input
+                                v-model="joinCode"
+                                placeholder="Game code"
+                                maxlength="6"
+                                class="w-full uppercase sm:w-32"
+                                :class="{ 'border-destructive': joinError }"
+                                @keyup.enter="handleJoin"
+                            />
+                            <Button
+                                variant="outline"
+                                size="lg"
+                                :disabled="joinLoading"
+                                @click="handleJoin"
+                            >
+                                {{ joinLoading ? 'Checking...' : 'Join' }}
+                            </Button>
+                        </div>
+                        <p
+                            v-if="joinError"
+                            class="mt-2 text-sm text-destructive"
+                        >
+                            {{ joinError }}
+                        </p>
                     </div>
                 </div>
             </div>

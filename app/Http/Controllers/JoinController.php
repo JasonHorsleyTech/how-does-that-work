@@ -72,7 +72,7 @@ class JoinController extends Controller
 
         $player = Player::create([
             'game_id' => $game->id,
-            'user_id' => null,
+            'user_id' => $request->user()?->id,
             'name' => trim($validated['name']),
             'is_host' => false,
             'has_submitted' => false,

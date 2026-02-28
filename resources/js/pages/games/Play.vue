@@ -100,6 +100,31 @@ let mediaRecorder: MediaRecorder | null = null;
 const recordingStream = ref<MediaStream | null>(null);
 let audioChunks: Blob[] = [];
 
+// Grading pipeline stage (from polling)
+const gradingStage = ref<'transcribing' | 'grading' | 'failed' | null>(null);
+
+const gradingStatusText = computed(() => {
+    const isMe = props.isActivePlayer;
+    switch (gradingStage.value) {
+        case 'transcribing':
+            return isMe
+                ? 'Transcribing your speech…'
+                : `Transcribing ${revealPlayerName.value}'s speech…`;
+        case 'grading':
+            return isMe
+                ? 'Grading your explanation…'
+                : `Grading ${revealPlayerName.value}'s explanation…`;
+        case 'failed':
+            return isMe
+                ? 'Something went wrong while processing your speech.'
+                : `Something went wrong while processing ${revealPlayerName.value}'s speech.`;
+        default:
+            return isMe
+                ? 'Processing your speech…'
+                : `Processing ${revealPlayerName.value}'s speech…`;
+    }
+});
+
 // Grading jokes rotation
 const currentJokeIndex = ref(0);
 const jokeVisible = ref(true);
@@ -124,61 +149,6 @@ function stopJokeRotation() {
         clearInterval(jokeInterval);
         jokeInterval = null;
     }
-}
-
-// Host audio upload fallback
-const hostUploadInput = ref<HTMLInputElement | null>(null);
-const hostUploadPhase = ref<'idle' | 'uploading' | 'error'>('idle');
-const hostUploadError = ref('');
-
-function triggerHostUpload() {
-    hostUploadInput.value?.click();
-}
-
-async function handleHostFileSelected(event: Event) {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file || !props.currentTurn) return;
-
-    hostUploadPhase.value = 'uploading';
-    hostUploadError.value = '';
-
-    const formData = new FormData();
-    formData.append('audio', file);
-
-    try {
-        const response = await fetch(
-            `/api/games/${props.game.code}/turns/${props.currentTurn.id}/host-upload-audio`,
-            {
-                method: 'POST',
-                headers: {
-                    'X-XSRF-TOKEN': getCsrfToken(),
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                body: formData,
-            },
-        );
-
-        if (response.ok) {
-            hostUploadPhase.value = 'idle';
-            // Start polling to detect grading completion
-            if (!pollInterval) {
-                pollInterval = setInterval(pollState, 3000);
-            }
-        } else {
-            const data = await response.json().catch(() => ({}));
-            hostUploadPhase.value = 'error';
-            hostUploadError.value =
-                data.message || data.error || 'Upload failed.';
-        }
-    } catch {
-        hostUploadPhase.value = 'error';
-        hostUploadError.value = 'Network error. Please try again.';
-    }
-
-    // Reset file input so the same file can be re-selected
-    input.value = '';
 }
 
 function getCsrfToken(): string {
@@ -449,6 +419,9 @@ async function pollState() {
                 return;
             }
 
+            // Update grading pipeline stage
+            gradingStage.value = data.gradingStage ?? null;
+
             if (
                 data.turnStatus === 'recording' &&
                 localTurnStatus.value === 'choosing'
@@ -461,6 +434,24 @@ async function pollState() {
                 );
             } else if (data.turnStatus !== localTurnStatus.value) {
                 localTurnStatus.value = data.turnStatus;
+            }
+
+            // Track player name for grading display
+            if (data.chosenTopicPlayerName) {
+                revealPlayerName.value = data.chosenTopicPlayerName;
+            }
+
+            // Start joke rotation when entering grading state
+            if (
+                (data.turnStatus === 'grading') &&
+                !jokeInterval
+            ) {
+                startJokeRotation();
+            }
+
+            // Stop joke rotation on failure
+            if (data.turnStatus === 'grading_failed') {
+                stopJokeRotation();
             }
 
             // Detect when active player starts recording
@@ -511,8 +502,8 @@ async function pollState() {
 <template>
     <Head :title="`Game — ${game.code}`" />
 
-    <!-- Host view: full app layout with sidebar -->
-    <AppLayout v-if="player.is_host" :breadcrumbs="breadcrumbs">
+    <!-- Host view: full app layout with sidebar (only when observing, not when it's the host's turn) -->
+    <AppLayout v-if="player.is_host && !isActivePlayer" :breadcrumbs="breadcrumbs">
         <div class="flex flex-1 flex-col items-center justify-center p-6">
             <div class="w-full max-w-xl space-y-6">
                 <div class="text-center">
@@ -561,37 +552,6 @@ async function pollState() {
                     <p class="mt-2 text-muted-foreground">
                         Waiting for them to pick.
                     </p>
-
-                    <!-- Host upload fallback -->
-                    <div class="mt-4 border-t pt-4">
-                        <input
-                            ref="hostUploadInput"
-                            type="file"
-                            accept=".mp3,.wav,.webm,.m4a,.ogg"
-                            class="hidden"
-                            @change="handleHostFileSelected"
-                        />
-                        <button
-                            v-if="hostUploadPhase !== 'uploading'"
-                            type="button"
-                            class="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
-                            @click="triggerHostUpload"
-                        >
-                            Upload Audio for {{ currentTurn.player_name }}
-                        </button>
-                        <p
-                            v-else
-                            class="text-sm text-muted-foreground"
-                        >
-                            Uploading…
-                        </p>
-                        <p
-                            v-if="hostUploadPhase === 'error'"
-                            class="mt-2 text-sm text-destructive"
-                        >
-                            {{ hostUploadError }}
-                        </p>
-                    </div>
                 </div>
 
                 <!-- Active player is explaining (host view) -->
@@ -610,37 +570,6 @@ async function pollState() {
                         {{ nonActiveTimeDisplay }}
                     </p>
                     <p class="mt-1 text-sm text-muted-foreground">remaining</p>
-
-                    <!-- Host upload fallback -->
-                    <div class="mt-4 border-t pt-4">
-                        <input
-                            ref="hostUploadInput"
-                            type="file"
-                            accept=".mp3,.wav,.webm,.m4a,.ogg"
-                            class="hidden"
-                            @change="handleHostFileSelected"
-                        />
-                        <button
-                            v-if="hostUploadPhase !== 'uploading'"
-                            type="button"
-                            class="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
-                            @click="triggerHostUpload"
-                        >
-                            Upload Audio for {{ revealPlayerName }}
-                        </button>
-                        <p
-                            v-else
-                            class="text-sm text-muted-foreground"
-                        >
-                            Uploading…
-                        </p>
-                        <p
-                            v-if="hostUploadPhase === 'error'"
-                            class="mt-2 text-sm text-destructive"
-                        >
-                            {{ hostUploadError }}
-                        </p>
-                    </div>
                 </div>
 
                 <!-- Active player is checking their microphone -->
@@ -652,37 +581,38 @@ async function pollState() {
                         {{ revealPlayerName }} is checking their microphone…
                     </p>
                     <p class="mt-2 text-muted-foreground">Almost time!</p>
+                </div>
 
-                    <!-- Host upload fallback -->
-                    <div class="mt-4 border-t pt-4">
-                        <input
-                            ref="hostUploadInput"
-                            type="file"
-                            accept=".mp3,.wav,.webm,.m4a,.ogg"
-                            class="hidden"
-                            @change="handleHostFileSelected"
-                        />
-                        <button
-                            v-if="hostUploadPhase !== 'uploading'"
-                            type="button"
-                            class="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
-                            @click="triggerHostUpload"
-                        >
-                            Upload Audio for {{ revealPlayerName }}
-                        </button>
-                        <p
-                            v-else
-                            class="text-sm text-muted-foreground"
-                        >
-                            Uploading…
-                        </p>
-                        <p
-                            v-if="hostUploadPhase === 'error'"
-                            class="mt-2 text-sm text-destructive"
-                        >
-                            {{ hostUploadError }}
-                        </p>
+                <!-- Grading in progress (host observing) -->
+                <div
+                    v-else-if="localTurnStatus === 'grading'"
+                    class="rounded-xl border p-8 text-center"
+                >
+                    <div class="flex justify-center mb-4">
+                        <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary/30 border-t-primary"></div>
                     </div>
+                    <p class="text-lg font-semibold">
+                        {{ gradingStatusText }}
+                    </p>
+                    <p
+                        class="mt-4 text-sm text-muted-foreground transition-opacity duration-300"
+                        :class="jokeVisible ? 'opacity-100' : 'opacity-0'"
+                    >
+                        {{ gradingJokes[currentJokeIndex] }}
+                    </p>
+                </div>
+
+                <!-- Grading failed (host observing) -->
+                <div
+                    v-else-if="localTurnStatus === 'grading_failed'"
+                    class="rounded-xl border border-destructive/50 p-8 text-center"
+                >
+                    <p class="text-lg font-semibold text-destructive">
+                        Grading Failed
+                    </p>
+                    <p class="mt-2 text-muted-foreground">
+                        {{ gradingStatusText }}
+                    </p>
                 </div>
 
                 <JoinLinkPanel :game-code="game.code" />
@@ -831,7 +761,7 @@ async function pollState() {
                 <p class="mt-2 text-muted-foreground">Hang tight!</p>
             </div>
 
-            <!-- Active player: done / grading -->
+            <!-- Active player: done / grading (before first poll updates localTurnStatus) -->
             <div
                 v-else-if="
                     localTurnStatus === 'recording' &&
@@ -840,7 +770,10 @@ async function pollState() {
                 "
                 class="rounded-xl border p-8 text-center"
             >
-                <p class="text-lg font-semibold">Great job!</p>
+                <div class="flex justify-center mb-4">
+                    <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary/30 border-t-primary"></div>
+                </div>
+                <p class="text-lg font-semibold">Processing your speech…</p>
                 <p
                     class="mt-4 text-sm text-muted-foreground transition-opacity duration-300"
                     :class="jokeVisible ? 'opacity-100' : 'opacity-0'"
@@ -988,6 +921,42 @@ async function pollState() {
                     {{ revealPlayerName }} is checking their microphone…
                 </p>
                 <p class="mt-2 text-muted-foreground">Almost time!</p>
+            </div>
+
+            <!-- Grading in progress -->
+            <div
+                v-else-if="localTurnStatus === 'grading'"
+                class="rounded-xl border p-8 text-center"
+            >
+                <div class="flex justify-center mb-4">
+                    <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary/30 border-t-primary"></div>
+                </div>
+                <p class="text-lg font-semibold">
+                    {{ gradingStatusText }}
+                </p>
+                <p
+                    v-if="isActivePlayer"
+                    class="mt-4 text-sm text-muted-foreground transition-opacity duration-300"
+                    :class="jokeVisible ? 'opacity-100' : 'opacity-0'"
+                >
+                    {{ gradingJokes[currentJokeIndex] }}
+                </p>
+                <p v-else class="mt-2 text-sm text-muted-foreground">
+                    Hang tight while we process the results…
+                </p>
+            </div>
+
+            <!-- Grading failed -->
+            <div
+                v-else-if="localTurnStatus === 'grading_failed'"
+                class="rounded-xl border border-destructive/50 p-8 text-center"
+            >
+                <p class="text-lg font-semibold text-destructive">
+                    Grading Failed
+                </p>
+                <p class="mt-2 text-muted-foreground">
+                    {{ gradingStatusText }}
+                </p>
             </div>
         </div>
     </div>

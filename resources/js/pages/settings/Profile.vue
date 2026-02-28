@@ -11,6 +11,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { edit } from '@/routes/profile';
 import { send } from '@/routes/verification';
+import { billing } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
 
 type Props = {
@@ -122,6 +123,34 @@ const user = page.props.auth.user;
                         </Transition>
                     </div>
                 </Form>
+            </div>
+
+            <div class="flex flex-col space-y-6">
+                <Heading
+                    variant="small"
+                    title="Game credits"
+                    description="Credits are used to run games — each player turn costs 2 credits"
+                />
+
+                <div class="rounded-lg border p-4">
+                    <p class="text-sm text-muted-foreground">
+                        Available Credits
+                    </p>
+                    <p class="text-3xl font-bold" :class="user.credits === 0 ? 'text-destructive' : ''">
+                        {{ user.credits }}
+                    </p>
+                    <p v-if="user.credits === 0" class="mt-1 text-sm text-destructive">
+                        You're out of credits. Buy more to start a game.
+                    </p>
+                </div>
+
+                <div>
+                    <Button variant="outline" as-child>
+                        <Link :href="billing()">
+                            Buy more credits
+                        </Link>
+                    </Button>
+                </div>
             </div>
 
             <DeleteUser />

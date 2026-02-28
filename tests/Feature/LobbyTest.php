@@ -49,6 +49,27 @@ test('unauthenticated user without session is forbidden from the lobby', functio
     $response->assertForbidden();
 });
 
+test('authenticated user who joined via join link can access lobby via session fallback', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $host = User::factory()->create();
+    $game = Game::factory()->create(['host_user_id' => $host->id, 'status' => 'lobby']);
+    Player::factory()->create(['game_id' => $game->id, 'user_id' => $host->id, 'is_host' => true]);
+
+    // Player joined via join link — has session player_id but user_id=null on player record
+    $player = Player::factory()->create(['game_id' => $game->id, 'user_id' => null, 'is_host' => false]);
+
+    $response = $this->withSession(["player_id.{$game->code}" => $player->id])
+        ->get(route('games.lobby', ['code' => $game->code]));
+
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->component('games/Lobby')
+        ->where('isHost', false)
+    );
+});
+
 test('authenticated user with no player record is forbidden from the lobby', function () {
     $user = User::factory()->create();
     $this->actingAs($user);

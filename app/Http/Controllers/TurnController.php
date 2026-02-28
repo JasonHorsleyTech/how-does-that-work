@@ -266,7 +266,7 @@ class TurnController extends Controller
         }
 
         $currentTurn = $game->turns()
-            ->whereIn('status', ['choosing', 'recording'])
+            ->whereIn('status', ['choosing', 'recording', 'grading', 'grading_failed'])
             ->with('player')
             ->orderBy('round_number')
             ->orderBy('turn_order')
@@ -277,16 +277,28 @@ class TurnController extends Controller
         $timeRemaining = null;
         $recordingStarted = false;
         $completedTurnId = null;
+        $gradingStage = null;
 
-        if ($currentTurn && $currentTurn->status === 'recording' && $currentTurn->topic_id) {
+        if ($currentTurn && in_array($currentTurn->status, ['recording', 'grading', 'grading_failed']) && $currentTurn->topic_id) {
             $topic = Topic::find($currentTurn->topic_id);
             $chosenTopicText = $topic?->text;
             $chosenTopicPlayerName = $currentTurn->player?->name;
 
-            if ($currentTurn->started_at) {
+            if ($currentTurn->status === 'recording' && $currentTurn->started_at) {
                 $recordingStarted = true;
                 $elapsed = max(0, now()->timestamp - $currentTurn->started_at->timestamp);
                 $timeRemaining = max(0, 120 - $elapsed);
+            }
+        }
+
+        if ($currentTurn && $currentTurn->status === 'grading_failed') {
+            $gradingStage = 'failed';
+        } elseif ($currentTurn && $currentTurn->status === 'grading') {
+            $pipelineLog = PipelineLog::where('turn_id', $currentTurn->id)->first();
+            if ($pipelineLog && $pipelineLog->gpt_sent_at && ! $pipelineLog->gpt_response_at) {
+                $gradingStage = 'grading';
+            } else {
+                $gradingStage = 'transcribing';
             }
         }
 
@@ -309,6 +321,7 @@ class TurnController extends Controller
             'recordingStarted' => $recordingStarted,
             'timeRemaining' => $timeRemaining,
             'completedTurnId' => $completedTurnId,
+            'gradingStage' => $gradingStage,
         ]);
     }
 
@@ -669,8 +682,9 @@ class TurnController extends Controller
     {
         if ($request->user()) {
             $player = $game->players()->where('user_id', $request->user()->id)->first();
-
-            return [$player, $player?->is_host ?? false];
+            if ($player) {
+                return [$player, $player->is_host ?? false];
+            }
         }
 
         $playerId = $request->session()->get("player_id.{$game->code}");
