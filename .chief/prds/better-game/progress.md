@@ -12,6 +12,8 @@
 - Multiple `ref="..."` in mutually exclusive `v-if`/`v-else-if` blocks works fine in Vue 3 — only one instance rendered at a time
 - `AudioVisualizer.vue` component: pass a `MediaStream`, renders frequency bars. Use `getByteFrequencyData` for bars, `fftSize: 64`, `smoothingTimeConstant: 0.7`
 - When passing a variable to a child component as a prop, it must be a `ref` — convert `let` variables to `ref()` if needed
+- Grading jokes live in `resources/js/utils/gradingJokes.ts` — easy to expand by adding strings to the array
+- Fade transitions: use CSS `transition-opacity duration-300` with a reactive `opacity-0`/`opacity-100` class toggle + `setTimeout` for the content swap
 
 ---
 
@@ -61,4 +63,18 @@
   - `smoothingTimeConstant: 0.7` prevents bars from being too jittery while still being responsive
   - When a non-ref variable (like `recordingStream`) needs to be passed to a child component as a prop, convert it to a `ref` so Vue's reactivity system can track it
   - CSS `transition-[height] duration-75` on bars provides smooth animation without needing JS-driven transitions
+---
+
+## 2026-02-27 - US-004
+- Implemented loading jokes during grading wait
+- Created `resources/js/utils/gradingJokes.ts` with 7 funny one-liners in a static array (easily expandable)
+- Jokes rotate every 4.5 seconds with a 400ms fade-out/fade-in transition using CSS `transition-opacity duration-300`
+- Replaced the static "Your explanation is being graded…" text in the `recordingPhase === 'done'` section of Play.vue
+- Joke rotation starts via a `watch` on `recordingPhase` when it becomes `'done'`, cleaned up on unmount
+- Starts at a random index so players don't always see the same first joke
+- Files changed: `resources/js/utils/gradingJokes.ts` (new), `resources/js/pages/games/Play.vue`
+- **Learnings for future iterations:**
+  - CSS opacity transitions + `setTimeout` for content swap is a clean approach for cycling text — no need for Vue `<Transition>` component
+  - Starting at a random index (`Math.floor(Math.random() * length)`) adds variety without complexity
+  - The `recordingPhase === 'done'` state in Play.vue is the active player's grading wait screen — polling detects `grading_complete` and navigates away
 ---

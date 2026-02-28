@@ -63,7 +63,7 @@
         "The joke array lives in a dedicated file or constant that's easy for the developer to update later"
       ],
       "priority": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-005",
