@@ -133,7 +133,7 @@
         "Test verifies redirect to the submit page (/games/LOBBY1/submit)"
       ],
       "priority": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-010",
