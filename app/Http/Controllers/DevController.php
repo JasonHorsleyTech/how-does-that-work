@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\RedirectToGameState;
 use App\Models\Game;
 use App\Models\Player;
 use App\Models\Turn;
@@ -14,7 +15,9 @@ class DevController extends Controller
 {
     public function index()
     {
-        $users = User::where('email', 'like', 'host-%@dev.test')->get();
+        $users = User::where('email', 'like', 'host-%@dev.test')
+            ->with(['games' => fn ($q) => $q->with('players')])
+            ->get();
 
         $games = Game::with(['host', 'players'])
             ->whereHas('host', fn ($q) => $q->where('email', 'like', 'host-%@dev.test'))
@@ -34,6 +37,26 @@ class DevController extends Controller
         Auth::loginUsingId($userId);
 
         return redirect('/dashboard');
+    }
+
+    public function loginAsPlayer(Request $request, int $playerId)
+    {
+        if (app()->environment('production')) {
+            abort(404);
+        }
+
+        $player = Player::with('game')->findOrFail($playerId);
+
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        $request->session()->put("player_id.{$player->game->code}", $player->id);
+
+        $url = RedirectToGameState::correctUrlForStatus($player->game)
+            ?? "/games/{$player->game->code}/lobby";
+
+        return redirect($url);
     }
 
     public function joinGame(Request $request, string $code)

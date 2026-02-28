@@ -27,6 +27,11 @@
         a:hover { color: #7dd3fc; text-decoration: underline; }
         .credits { font-weight: 600; color: #fbbf24; }
         .warning { background: #422006; border: 1px solid #92400e; border-radius: 0.5rem; padding: 0.75rem 1rem; margin-bottom: 1.5rem; color: #fcd34d; font-size: 0.875rem; }
+        .player-links { padding: 0.5rem 0.75rem 0.75rem 2rem; }
+        .player-links td { border-bottom: 1px solid #1e293b; padding: 0.25rem 0.75rem; }
+        .player-links .player-label { color: #94a3b8; font-size: 0.8rem; }
+        .player-links a { color: #a78bfa; }
+        .player-links a:hover { color: #c4b5fd; }
     </style>
 </head>
 <body>
@@ -80,6 +85,19 @@
                     </td>
                     <td><a href="{{ route('dev.login-as', $user->id) }}">Login as {{ $user->name }}</a></td>
                 </tr>
+                @foreach ($user->games as $game)
+                    @php $guestPlayers = $game->players->where('is_host', false); @endphp
+                    @if ($guestPlayers->isNotEmpty())
+                    <tr class="player-links">
+                        <td colspan="5">
+                            <span class="player-label">Game <code>{{ $game->code }}</code> <span class="badge badge-{{ $game->status }}">{{ $game->status }}</span> — players:</span>
+                            @foreach ($guestPlayers as $player)
+                                <a href="{{ route('dev.login-as-player', $player->id) }}">{{ $player->name }}</a>@if (!$loop->last), @endif
+                            @endforeach
+                        </td>
+                    </tr>
+                    @endif
+                @endforeach
                 @endforeach
                 @if ($users->isEmpty())
                 <tr><td colspan="5" style="color:#64748b; text-align:center; padding:1.5rem;">No dev users seeded yet. Run <code>php artisan db:seed</code></td></tr>
