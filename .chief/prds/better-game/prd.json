@@ -1,0 +1,266 @@
+{
+  "project": "Better Game — UX Polish, Grading Overhaul, and E2E Tests",
+  "description": "The game works end-to-end but needs polish in several areas to feel like a finished product. This PRD covers five UX improvements (early mic permission, host audio upload fallback, recording visualizer, loading jokes during grading, and a complete GPT prompt rewrite) plus comprehensive Playwright e2e test coverage. Each improvement is scoped to be implementable in a single focused session.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Request Microphone Permission on Join",
+      "description": "As a player joining a game, I want to be prompted for microphone permission when I enter my name so that mic issues surface immediately — not mid-game when it's my turn.",
+      "acceptanceCriteria": [
+        "When a guest player lands on the Join page (/join/{code}), after they enter their name and before or as they submit, the browser's microphone permission prompt is triggered",
+        "If permission is granted, store that state so we don't re-prompt later during mic test",
+        "If permission is denied, show a friendly warning: \"Microphone access was denied. You can still play, but the host may need to upload audio on your behalf.\"",
+        "The mic stream is immediately released after permission is obtained (don't keep it open)",
+        "This does not block joining the game — players can still join even if they deny mic access",
+        "Existing mic test flow during the play phase still works and skips the permission request if already granted"
+      ],
+      "priority": 1,
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Host Audio Upload Fallback",
+      "description": "As a host, I want to upload an audio file on behalf of a player whose microphone isn't working so that the game doesn't stall.",
+      "acceptanceCriteria": [
+        "On the host's Play page, when a player's turn is active and the player is in the recording or choosing state, the host sees an \"Upload Audio for [Player Name]\" button",
+        "Clicking the button opens a file picker that accepts common audio formats: .mp3, .wav, .webm, .m4a, .ogg",
+        "The uploaded file is sent to the existing storeAudio endpoint (or a new host-specific endpoint) with proper authorization",
+        "The server converts/stores the audio and triggers the same transcription + grading pipeline as a normal recording",
+        "After upload, the turn progresses to grading status identically to a player-recorded turn",
+        "Non-host players do not see the upload button",
+        "The upload button is only visible during the active player's recording phase, not after audio is already submitted"
+      ],
+      "priority": 2,
+      "passes": false
+    },
+    {
+      "id": "US-003",
+      "title": "Audio Visualizer During Recording",
+      "description": "As a player recording my explanation, I want to see animated audio bars responding to my voice so I know the microphone is actually capturing audio.",
+      "acceptanceCriteria": [
+        "During the recording phase, the player's phone screen shows an audio visualizer (vertical bars that react to voice volume)",
+        "The visualizer uses the existing Web Audio API AnalyserNode setup (already in the codebase for mic test) to get frequency/time domain data",
+        "Bars animate smoothly — rising when the player speaks louder, falling during silence",
+        "The visualizer is displayed between the topic text and the countdown timer",
+        "Minimum 5 bars, styled to match the app's design system (Tailwind classes)",
+        "The visualizer only appears on the recording player's phone, not on the host/TV screen",
+        "Performance: visualizer runs at ~30fps without janking the recording or countdown timer"
+      ],
+      "priority": 3,
+      "passes": false
+    },
+    {
+      "id": "US-004",
+      "title": "Loading Jokes During Grading Wait",
+      "description": "As a player waiting for my explanation to be graded, I want to see funny one-liners cycling on screen so the wait doesn't feel like a dead screen.",
+      "acceptanceCriteria": [
+        "After a player's audio is uploaded and the turn enters grading status, the active player's screen shows rotating joke text",
+        "Start with a static array of at least 3 generic jokes/one-liners (hardcoded, easily expandable later)",
+        "Jokes cycle every 4-5 seconds with a fade or slide transition",
+        "Example jokes (placeholder — can be swapped later): \"Did you know? Most refrigerators are just cold boxes with anxiety.\", \"Fun fact: Nobody actually knows how printers work. Not even printers.\", \"Your explanation is being reviewed by our finest artificial judges...\"",
+        "The jokes replace the current static \"Your explanation is being graded...\" text",
+        "When grading completes (poll detects grading_complete), jokes stop and navigation to results happens as before",
+        "The joke array lives in a dedicated file or constant that's easy for the developer to update later"
+      ],
+      "priority": 4,
+      "passes": false
+    },
+    {
+      "id": "US-005",
+      "title": "GPT Grading Prompt Overhaul — Tone and Scoring",
+      "description": "As the game designer, I want the GPT grading prompt rewritten so scores are varied and precise, the tone is a dry roast (like a close friend making fun of you), and genuinely good explanations are rewarded with top marks.",
+      "acceptanceCriteria": [
+        "Score precision: Scores use up to one decimal place (e.g., 34.5, 72.8, 91.0). The score field in the Turn model and database supports decimal values (float/decimal column, not integer)",
+        "Score distribution: Scores spread across the full 0-100 range. A mediocre rambling explanation might get a 28.5. A decent attempt with some right ideas gets a 55. Near-perfect gets 95+. The prompt explicitly instructs GPT not to cluster around 60-80",
+        "Tone — dry roast: The feedback reads like a close friend making fun of you. Dry, not overtly sarcastic. Quotes specific things the player said that were, in retrospect, pretty dumb. Makes them feel dumb but in a friendly, lovable way",
+        "Failing grades: GPT is not afraid to give F grades and single-digit scores when the explanation is completely wrong or nonsensical. The prompt explicitly tells GPT that low scores are expected and encouraged when warranted",
+        "Rewarding excellence: If a player genuinely nails an explanation with accurate detail, they get a 95-100 and the feedback acknowledges their expertise (can still be funny, but respectful of the achievement)",
+        "Grade mapping updated: Grade letters map to the new score range realistically (e.g., A: 90-100, B: 80-89.9, C: 70-79.9, D: 60-69.9, F: below 60) — or whatever mapping makes the most sense for the new distribution",
+        "Feedback length: 3-5 sentences, with at least one direct quote from the player's transcript highlighted for comedic effect",
+        "actual_explanation: Remains factual and helpful (3-5 sentences), no humor here — this is the \"learn something\" moment",
+        "All existing tests that reference integer scores are updated to handle decimal scores",
+        "The Results page displays scores with one decimal place (e.g., \"72.5/100\")",
+        "Player cumulative scores in the scoreboard handle decimal addition correctly"
+      ],
+      "priority": 5,
+      "passes": false
+    },
+    {
+      "id": "US-006",
+      "title": "Playwright E2E Test — Smoke and Homepage",
+      "description": "As a developer, I want a Playwright smoke test that verifies the app loads and the homepage renders correctly.",
+      "acceptanceCriteria": [
+        "Test loads the homepage and verifies it renders without errors",
+        "Test verifies key elements are present (app name, navigation, or join link)",
+        "Test runs in under 5 seconds"
+      ],
+      "priority": 6,
+      "passes": false
+    },
+    {
+      "id": "US-007",
+      "title": "Playwright E2E Test — Host Creates Game",
+      "description": "As a developer, I want a Playwright test that verifies a host can create a new game from the dashboard.",
+      "acceptanceCriteria": [
+        "Test logs in as a host user (e.g., user 3 via /dev/login-as/3)",
+        "Test navigates to game creation and creates a game",
+        "Test verifies redirect to lobby page with a game code displayed",
+        "Test verifies the host appears in the player list"
+      ],
+      "priority": 6,
+      "passes": false
+    },
+    {
+      "id": "US-008",
+      "title": "Playwright E2E Test — Guest Joins Game via Join Page",
+      "description": "As a developer, I want a Playwright test that verifies a guest can join an existing game.",
+      "acceptanceCriteria": [
+        "Test uses a seeded lobby game (e.g., LOBBY1)",
+        "Test navigates to /join/LOBBY1, enters a name, and submits",
+        "Test verifies redirect to the lobby page",
+        "Test verifies the new player appears in the player list or that the lobby page loads correctly"
+      ],
+      "priority": 6,
+      "passes": false
+    },
+    {
+      "id": "US-009",
+      "title": "Playwright E2E Test — Host Starts Submission Phase",
+      "description": "As a developer, I want a Playwright test that verifies the host can transition a game from lobby to submitting.",
+      "acceptanceCriteria": [
+        "Test logs in as the lobby game host (user 3, game LOBBY1)",
+        "Test clicks \"Start Submission Phase\" button",
+        "Test verifies redirect to the submit page (/games/LOBBY1/submit)"
+      ],
+      "priority": 6,
+      "passes": false
+    },
+    {
+      "id": "US-010",
+      "title": "Playwright E2E Test — Player Submits Topics",
+      "description": "As a developer, I want a Playwright test that verifies a player can submit their 3 topics during the submission phase.",
+      "acceptanceCriteria": [
+        "Test logs in as the submitting game host (user 6, game SUBMIT) or joins as a guest player on a submitting game",
+        "Test fills in 3 topic fields and submits",
+        "Test verifies success feedback or that submission count updates"
+      ],
+      "priority": 6,
+      "passes": false
+    },
+    {
+      "id": "US-011",
+      "title": "Playwright E2E Test — Host Starts Game When All Submitted",
+      "description": "As a developer, I want a Playwright test that verifies the host can start the game when all topics are submitted.",
+      "acceptanceCriteria": [
+        "Test logs in as the ready game host (user 7, game READY1)",
+        "Test clicks \"Start Game\" button",
+        "Test verifies redirect to the play page (/games/READY1/play)"
+      ],
+      "priority": 6,
+      "passes": false
+    },
+    {
+      "id": "US-012",
+      "title": "Playwright E2E Test — Active Player Chooses Topic",
+      "description": "As a developer, I want a Playwright test that verifies the active player can choose a topic from their options.",
+      "acceptanceCriteria": [
+        "Test logs in as a player in the choosing state (use dev route to log in as the choosing player on game CHOOSE)",
+        "Test verifies topic choices are displayed",
+        "Test clicks one of the topic choices",
+        "Test verifies the turn advances to the recording state (topic is shown, recording UI appears)"
+      ],
+      "priority": 7,
+      "passes": false
+    },
+    {
+      "id": "US-013",
+      "title": "Playwright E2E Test — Results Page Displays Correctly",
+      "description": "As a developer, I want a Playwright test that verifies the results page shows grade, score, feedback, and actual explanation.",
+      "acceptanceCriteria": [
+        "Test logs in as the graded game host (user 9, game GRADED)",
+        "Test navigates to the results page for the completed turn",
+        "Test verifies the grade badge, score, feedback text, and actual explanation are all visible",
+        "Test verifies the scoreboard shows all players with scores"
+      ],
+      "priority": 7,
+      "passes": false
+    },
+    {
+      "id": "US-014",
+      "title": "Playwright E2E Test — Host Advances Turn from Results",
+      "description": "As a developer, I want a Playwright test that verifies the host can advance to the next player from the results page.",
+      "acceptanceCriteria": [
+        "Test logs in as the graded game host (user 9, game GRADED)",
+        "Test navigates to results and clicks \"Next Player\" button",
+        "Test verifies navigation to the play page for the next turn"
+      ],
+      "priority": 7,
+      "passes": false
+    },
+    {
+      "id": "US-015",
+      "title": "Playwright E2E Test — Round Complete and Next Round",
+      "description": "As a developer, I want a Playwright test that verifies the round complete page shows the scoreboard and the host can start the next round.",
+      "acceptanceCriteria": [
+        "Test logs in as the round-done host (user 10, game RNDDNE)",
+        "Test verifies the round complete page shows scores for all players",
+        "Test clicks \"Start Next Round\" (if multi-round) or \"Finalize\" button",
+        "Test verifies navigation to the next game state"
+      ],
+      "priority": 7,
+      "passes": false
+    },
+    {
+      "id": "US-016",
+      "title": "Playwright E2E Test — Completed Game Final Results",
+      "description": "As a developer, I want a Playwright test that verifies the completed game page shows final rankings and all turn results.",
+      "acceptanceCriteria": [
+        "Test logs in as the veteran host (user 5, game COMPLT)",
+        "Test navigates to /games/COMPLT/complete",
+        "Test verifies final rankings are displayed with player names and scores",
+        "Test verifies individual turn results (topics, grades) are shown",
+        "Test verifies a \"Play Again\" button is present"
+      ],
+      "priority": 7,
+      "passes": false
+    },
+    {
+      "id": "US-017",
+      "title": "Playwright E2E Test — Guest Reconnection",
+      "description": "As a developer, I want a Playwright test that verifies a guest player can reconnect to a game after refreshing.",
+      "acceptanceCriteria": [
+        "Test logs in as a guest player on a seeded game via /dev/login-as-player/{playerId}",
+        "Test verifies the correct game page loads",
+        "Test refreshes the page",
+        "Test verifies the player is still in the game and on the correct page (not kicked back to join)"
+      ],
+      "priority": 8,
+      "passes": false
+    },
+    {
+      "id": "US-018",
+      "title": "Playwright E2E Test — Host Dashboard Shows Active Games",
+      "description": "As a developer, I want a Playwright test that verifies the host dashboard shows their active games with rejoin links.",
+      "acceptanceCriteria": [
+        "Test logs in as a host with active games (e.g., user 2 who hosts game PLAYNG)",
+        "Test navigates to /dashboard",
+        "Test verifies at least one game is listed with its code and status",
+        "Test clicks \"Rejoin\" and verifies redirect to the correct game page"
+      ],
+      "priority": 8,
+      "passes": false
+    },
+    {
+      "id": "US-019",
+      "title": "Playwright E2E Test — State Redirect Middleware",
+      "description": "As a developer, I want a Playwright test that verifies players are redirected to the correct page when they try to access a wrong game phase.",
+      "acceptanceCriteria": [
+        "Test logs in as a host for a game in playing status",
+        "Test manually navigates to /games/{code}/lobby (wrong phase)",
+        "Test verifies automatic redirect to the correct page (/games/{code}/play)"
+      ],
+      "priority": 8,
+      "passes": false
+    }
+  ]
+}
