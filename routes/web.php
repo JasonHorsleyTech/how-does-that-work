@@ -55,6 +55,7 @@ Route::post('games/{code}/topics', [TopicController::class, 'store'])->name('gam
 Route::post('games/{code}/turns/{turnId}/choose-topic', [TurnController::class, 'chooseTopic'])->name('games.turns.choose-topic');
 Route::post('games/{code}/turns/{turnId}/start-recording', [TurnController::class, 'startRecording'])->name('games.turns.start-recording');
 Route::post('api/games/{code}/turns/{turnId}/audio', [TurnController::class, 'storeAudio'])->name('games.turns.store-audio');
+Route::post('api/games/{code}/turns/{turnId}/host-upload-audio', [TurnController::class, 'hostUploadAudio'])->name('games.turns.host-upload-audio');
 Route::post('games/{code}/advance', [TurnController::class, 'advance'])->name('games.advance');
 Route::post('games/{code}/start-next-round', [TurnController::class, 'startNextRound'])->name('games.start-next-round');
 Route::post('games/{code}/finalize', [TurnController::class, 'finalizeGame'])->name('games.finalize');

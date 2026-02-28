@@ -31,7 +31,8 @@
         "The upload button is only visible during the active player's recording phase, not after audio is already submitted"
       ],
       "priority": 2,
-      "passes": false
+      "passes": true,
+      "inProgress": true
     },
     {
       "id": "US-003",
