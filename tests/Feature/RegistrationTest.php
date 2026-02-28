@@ -51,6 +51,30 @@ test('registration requires a valid email', function () {
     $this->assertGuest();
 });
 
+test('registration accepts a 4-character password', function () {
+    $response = $this->post('/register', [
+        'name' => 'Test Host',
+        'email' => 'test@example.com',
+        'password' => 'abcd',
+        'password_confirmation' => 'abcd',
+    ]);
+
+    $response->assertSessionHasNoErrors();
+    $this->assertAuthenticated();
+});
+
+test('registration rejects a 3-character password', function () {
+    $response = $this->post('/register', [
+        'name' => 'Test Host',
+        'email' => 'test@example.com',
+        'password' => 'abc',
+        'password_confirmation' => 'abc',
+    ]);
+
+    $response->assertSessionHasErrors('password');
+    $this->assertGuest();
+});
+
 test('registration requires a confirmed password', function () {
     $response = $this->post('/register', [
         'name' => 'Test',
