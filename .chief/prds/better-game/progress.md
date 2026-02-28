@@ -19,6 +19,10 @@
 - Score fields are `decimal` in DB, cast to `'float'` in models — use `round(..., 1)` when storing
 - `.chief/` directory is in `.gitignore` — use `git add -f` to commit PRD changes
 - Many E2E tests were pre-written in bulk commit `56b65dc` — check `game-flow.spec.ts` before writing new tests
+- E2E guest login: use `loginAsPlayer(page, playerId)` helper for guest players; `loginAs(page, userId)` for host users
+- Player IDs are deterministic: Lobby 1-3, Playing 4-7, Completed 8-10, Submitting 11-13, Ready 14-16, Choosing 17-19, Graded 20-22, RoundDone 23-25
+- E2E score assertions: use regex like `/82.*\/100/` instead of exact strings — score may render as "82" or "82.0" depending on build state
+- E2E text that appears in both content and breadcrumbs/sidebar: use `{ exact: true }` or CSS selectors to avoid strict mode violations
 
 ---
 
@@ -182,4 +186,35 @@
   - The READY1 game is seeded with status `submitting` and all 3 players having `has_submitted: true` — this makes the "Start Game" button visible
   - The submit page for the host shows a "Start Game" button when all players have submitted their topics
   - Another pre-written test from bulk commit `56b65dc` — always check existing tests first
+---
+
+## 2026-02-27 - US-012
+- Added "active player chooses topic from options" E2E test in `tests/e2e/game-flow.spec.ts`
+- Added `loginAsPlayer` helper to `tests/e2e/helpers.ts` for logging in as guest players via `/dev/login-as-player/{playerId}`
+- Test logs in as Jolly Panda (Player 18) — the active choosing player on game CHOOSE
+- Verifies choosing UI ("It's your turn!", "Choose the topic you'd like to explain."), topic choices ("How does a helicopter hover?", "How does a 3D printer build objects?")
+- Clicks a topic and verifies turn advances to recording state ("You chose:" + topic text)
+- All 15 E2E tests pass in ~5.3s
+- Files changed: `tests/e2e/game-flow.spec.ts`, `tests/e2e/helpers.ts`, `.chief/prds/better-game/prd.json`
+- **Learnings for future iterations:**
+  - `/dev/login-as-player/{playerId}` sets the guest player session and redirects to the correct game page via `RedirectToGameState::correctUrlForStatus` — no auth user needed
+  - Player IDs are deterministic from the seeder: count all `Player::create()` calls in order (Lobby: 1-3, Playing: 4-7, Completed: 8-10, Submitting: 11-13, Ready: 14-16, Choosing: 17-19, Graded: 20-22, RoundDone: 23-25)
+  - The choosing → recording transition happens server-side via `chooseTopic()` POST which sets `turn.status = 'recording'` and redirects to `/games/{code}/play`
+  - Guest player pages don't use `AppLayout` so scoping to `page.getByRole('main')` isn't needed
+---
+
+## 2026-02-27 - US-013
+- Added "results page displays grade, score, feedback, and scoreboard" E2E test in `tests/e2e/game-flow.spec.ts`
+- Test logs in as HOST_GRADING_DONE (user 9), navigates to `/games/GRADED/play` (middleware redirects to results page)
+- Verifies: heading "Turn Results", player name "Bold Otter", topic "How does a parachute slow your fall?"
+- Verifies grade badge (B) via `.rounded-lg.border-2` CSS selector, score (/100), feedback text, actual explanation ("The Real Answer")
+- Verifies scoreboard with all 3 players (Host Grading Done, Bold Otter, Gentle Fox) and their scores
+- All 16 E2E tests pass in ~5.1s
+- Files changed: `tests/e2e/game-flow.spec.ts`, `.chief/prds/better-game/prd.json`
+- **Learnings for future iterations:**
+  - "Bold Otter" appears twice on the results page (player header + scoreboard) — use `{ exact: true }` to avoid strict mode violations
+  - "Grade" substring matches breadcrumb "Game — GRADED" — use CSS selector `.rounded-lg.border-2` for the grade badge, or `{ exact: true }`
+  - Score display may vary between "82" and "82.0" depending on whether Vite dev server is running (production build vs dev) — use regex `/82.*\/100/` for resilient matching
+  - The GRADED game redirects host from `/play` to `/results/{turnId}` via state middleware — use `toHaveURL(regex)` to match the dynamic turn ID
+  - Scoping to `page.getByRole('main')` is essential on host pages to avoid matching sidebar elements
 ---

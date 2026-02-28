@@ -119,6 +119,43 @@ test('active player chooses topic from options', async ({ page }) => {
     await expect(page.getByText('How does a helicopter hover?')).toBeVisible();
 });
 
+test('results page displays grade, score, feedback, and scoreboard', async ({ page }) => {
+    await loginAs(page, HOST_GRADING_DONE);
+    // Navigate to any game URL — middleware redirects to results page
+    await page.goto(`/games/${GRADED_CODE}/play`);
+    await expect(page).toHaveURL(new RegExp(`/games/${GRADED_CODE}/results/\\d+`));
+
+    const main = page.getByRole('main');
+
+    // Verify heading
+    await expect(main.getByText('Turn Results')).toBeVisible();
+
+    // Verify player name and topic
+    await expect(main.getByText('Bold Otter', { exact: true })).toBeVisible();
+    await expect(main.getByText('How does a parachute slow your fall?')).toBeVisible();
+
+    // Verify grade badge (B) and score (/100)
+    const gradeBadge = main.locator('.rounded-lg.border-2');
+    await expect(gradeBadge).toBeVisible();
+    await expect(gradeBadge).toHaveText('B');
+    await expect(main.getByText(/82.*\/100/)).toBeVisible();
+
+    // Verify feedback section
+    await expect(main.getByText('Feedback')).toBeVisible();
+    await expect(main.getByText(/Good grasp of the basic physics/)).toBeVisible();
+
+    // Verify actual explanation section
+    await expect(main.getByText('The Real Answer')).toBeVisible();
+    await expect(main.getByText(/parachute slows descent through aerodynamic drag/)).toBeVisible();
+
+    // Verify scoreboard with all players and scores
+    await expect(main.getByText('Scoreboard')).toBeVisible();
+    await expect(main.getByText('Host Grading Done')).toBeVisible();
+    await expect(main.getByText('Gentle Fox')).toBeVisible();
+    await expect(main.getByText(/82.*pts/)).toBeVisible();
+    await expect(main.getByText(/0.*pts/).first()).toBeVisible();
+});
+
 test('host advances turn from results page', async ({ page }) => {
     await loginAs(page, HOST_GRADING_DONE);
     // Navigate to any game URL — middleware redirects to results page

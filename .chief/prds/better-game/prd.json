@@ -183,7 +183,7 @@
         "Test verifies the scoreboard shows all players with scores"
       ],
       "priority": 7,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-014",
