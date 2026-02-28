@@ -21,6 +21,8 @@
         .badge-playing { background: #14532d; color: #4ade80; }
         .badge-complete { background: #2d1b69; color: #a78bfa; }
         .badge-submitting { background: #7c2d12; color: #fb923c; }
+        .badge-grading_complete { background: #4a1d6a; color: #c084fc; }
+        .badge-round_complete { background: #164e63; color: #22d3ee; }
         a { color: #38bdf8; text-decoration: none; font-family: monospace; font-size: 0.85rem; }
         a:hover { color: #7dd3fc; text-decoration: underline; }
         .credits { font-weight: 600; color: #fbbf24; }
@@ -62,6 +64,16 @@
                             2 credits — test out-of-credits warnings
                         @elseif ($user->email === 'host-veteran@dev.test')
                             150 credits — has completed game in history
+                        @elseif ($user->email === 'host-submitting@dev.test')
+                            Scenario: submitting phase, host hasn't submitted yet
+                        @elseif ($user->email === 'host-ready@dev.test')
+                            Scenario: all submitted, ready to start game
+                        @elseif ($user->email === 'host-choosing@dev.test')
+                            Scenario: playing phase, active player choosing topic
+                        @elseif ($user->email === 'host-grading-done@dev.test')
+                            Scenario: grading complete, host can advance turn
+                        @elseif ($user->email === 'host-round-done@dev.test')
+                            Scenario: round complete, host can start next round
                         @else
                             Dev account
                         @endif

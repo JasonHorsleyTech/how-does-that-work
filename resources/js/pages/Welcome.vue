@@ -46,14 +46,17 @@ function handleJoin() {
             </nav>
         </header>
 
-        <main class="flex flex-1 flex-col items-center justify-center px-6 py-12 md:py-20">
+        <main
+            class="flex flex-1 flex-col items-center justify-center px-6 py-12 md:py-20"
+        >
             <!-- Hero -->
             <div class="w-full max-w-2xl text-center">
                 <h1 class="text-4xl font-bold tracking-tight md:text-6xl">
                     How Does That Work?
                 </h1>
                 <p class="mt-4 text-lg text-muted-foreground md:text-xl">
-                    Reveal how little you actually understand about everyday things — and just how magical the world really is.
+                    Reveal how little you actually understand about everyday
+                    things — and just how magical the world really is.
                 </p>
 
                 <!-- CTAs -->

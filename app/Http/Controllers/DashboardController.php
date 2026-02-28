@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\RedirectToGameState;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -25,6 +26,7 @@ class DashboardController extends Controller
                     'created_at' => $game->created_at->toIso8601String(),
                     'player_count' => $game->players->count(),
                     'winner' => $winner ? ['name' => $winner->name, 'score' => $winner->score] : null,
+                    'rejoin_url' => $game->status !== 'complete' ? RedirectToGameState::correctUrlForStatus($game) : null,
                 ];
             });
 

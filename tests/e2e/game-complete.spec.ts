@@ -1,13 +1,4 @@
-import { execSync } from 'child_process';
 import { test, expect } from '@playwright/test';
-
-test.beforeAll(() => {
-    // Reset the database and seed dev data so host-veteran has a completed game
-    execSync('php artisan migrate:fresh --seed --force', {
-        cwd: process.cwd(),
-        stdio: 'pipe',
-    });
-});
 
 test('game over screen renders winner correctly', async ({ page }) => {
     // Use the dev helper to log in as host-veteran and redirect to completed game page
@@ -33,7 +24,7 @@ test('game over screen shows all players ranked by total score', async ({ page }
     await expect(page.locator('text=Final Scores')).toBeVisible();
 
     // Rapid Owl wins with 92 points (seeded in DevSeeder)
-    await expect(page.locator('text=Rapid Owl')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Rapid Owl/ })).toBeVisible();
 });
 
 test('game over screen shows per-player turn history', async ({ page }) => {

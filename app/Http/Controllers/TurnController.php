@@ -22,18 +22,6 @@ class TurnController extends Controller
             abort(403);
         }
 
-        if ($game->status === 'complete') {
-            return redirect("/games/{$game->code}/complete");
-        }
-
-        if ($game->status === 'round_complete') {
-            return redirect("/games/{$game->code}/round-complete");
-        }
-
-        if ($game->status !== 'playing') {
-            return redirect("/games/{$game->code}/lobby");
-        }
-
         $currentTurn = $game->turns()
             ->whereIn('status', ['choosing', 'recording'])
             ->with('player')
@@ -130,6 +118,7 @@ class TurnController extends Controller
         ]);
 
         $game->update(['state_updated_at' => now()]);
+        $player->touch();
 
         return redirect("/games/{$game->code}/play");
     }
@@ -270,6 +259,11 @@ class TurnController extends Controller
             abort(403);
         }
 
+        // Touch player updated_at to keep reconnect window alive
+        if (! $player->user_id) {
+            $player->touch();
+        }
+
         $currentTurn = $game->turns()
             ->whereIn('status', ['choosing', 'recording'])
             ->with('player')
@@ -339,6 +333,7 @@ class TurnController extends Controller
 
         $turn->update(['started_at' => now()]);
         $game->update(['state_updated_at' => now()]);
+        $player->touch();
 
         return response()->json(['started_at' => $turn->fresh()->started_at->toISOString()]);
     }
@@ -380,6 +375,7 @@ class TurnController extends Controller
         ]);
 
         $game->update(['state_updated_at' => now()]);
+        $player->touch();
 
         dispatch(new TranscribeAudio($turn));
 

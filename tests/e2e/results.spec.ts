@@ -1,13 +1,4 @@
-import { execSync } from 'child_process';
 import { test, expect } from '@playwright/test';
-
-test.beforeAll(() => {
-    // Reset the database and seed dev data so host-veteran has a completed game
-    execSync('php artisan migrate:fresh --seed --force', {
-        cwd: process.cwd(),
-        stdio: 'pipe',
-    });
-});
 
 test('results page renders all fields correctly after a completed turn', async ({ page }) => {
     // Use the dev helper to log in as host-veteran and redirect to a completed turn's results page

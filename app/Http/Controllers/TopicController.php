@@ -19,10 +19,6 @@ class TopicController extends Controller
             abort(403);
         }
 
-        if ($game->status !== 'submitting') {
-            return redirect("/games/{$game->code}/lobby");
-        }
-
         $allPlayers = $game->players()->get(['id', 'name', 'has_submitted']);
         $submittedCount = $allPlayers->where('has_submitted', true)->count();
         $totalCount = $allPlayers->count();
@@ -72,7 +68,7 @@ class TopicController extends Controller
 
         $validated = $request->validate([
             'topics' => ['required', 'array', 'size:3'],
-            'topics.*' => ['required', 'string', 'min:5', 'max:120'],
+            'topics.*' => ['required', 'string', 'min:1', 'max:120'],
         ]);
 
         foreach ($validated['topics'] as $text) {

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
 import { Button } from '@/components/ui/button';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
+import { type BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: dashboard().url },
@@ -61,12 +61,19 @@ function submit() {
                                 <span>2 rounds</span>
                             </label>
                         </div>
-                        <p v-if="form.errors.max_rounds" class="text-sm text-destructive">
+                        <p
+                            v-if="form.errors.max_rounds"
+                            class="text-sm text-destructive"
+                        >
                             {{ form.errors.max_rounds }}
                         </p>
                     </fieldset>
 
-                    <Button type="submit" class="w-full" :disabled="form.processing">
+                    <Button
+                        type="submit"
+                        class="w-full"
+                        :disabled="form.processing"
+                    >
                         {{ form.processing ? 'Creating…' : 'Create Game' }}
                     </Button>
                 </form>
