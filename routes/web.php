@@ -45,6 +45,7 @@ Route::middleware([RedirectToGameState::class])->group(function () {
 });
 
 // Game polling/API endpoints — no redirect middleware
+Route::get('games/{code}/exists', [GameController::class, 'exists'])->name('games.exists');
 Route::get('games/{code}/players', [GameController::class, 'players'])->name('games.players');
 Route::get('games/{code}/submission-status', [GameController::class, 'submissionStatus'])->name('games.submission-status');
 Route::get('games/{code}/play-state', [TurnController::class, 'playState'])->name('games.play-state');

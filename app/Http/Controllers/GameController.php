@@ -11,6 +11,13 @@ use Inertia\Inertia;
 
 class GameController extends Controller
 {
+    public function exists(string $code): JsonResponse
+    {
+        $exists = Game::where('code', strtoupper($code))->exists();
+
+        return response()->json(['exists' => $exists]);
+    }
+
     public function create()
     {
         return Inertia::render('games/Create');
@@ -47,14 +54,16 @@ class GameController extends Controller
         $game = Game::with(['players'])->where('code', strtoupper($code))->firstOrFail();
 
         $isHost = false;
+        $player = null;
 
         if ($request->user()) {
             $player = $game->players()->where('user_id', $request->user()->id)->first();
-            if (! $player) {
-                abort(403);
+            if ($player) {
+                $isHost = (bool) $player->is_host;
             }
-            $isHost = (bool) $player->is_host;
-        } else {
+        }
+
+        if (! $player) {
             $playerId = $request->session()->get("player_id.{$game->code}");
             if (! $playerId || ! $game->players()->where('id', $playerId)->exists()) {
                 abort(403);
@@ -73,9 +82,13 @@ class GameController extends Controller
         $game = Game::where('code', strtoupper($code))->firstOrFail();
 
         $playerId = null;
+        $hasAccess = false;
+
         if ($request->user()) {
             $hasAccess = $game->players()->where('user_id', $request->user()->id)->exists();
-        } else {
+        }
+
+        if (! $hasAccess) {
             $playerId = $request->session()->get("player_id.{$game->code}");
             $hasAccess = $playerId && $game->players()->where('id', $playerId)->exists();
         }
@@ -125,9 +138,13 @@ class GameController extends Controller
         $game = Game::where('code', strtoupper($code))->firstOrFail();
 
         $playerId = null;
+        $hasAccess = false;
+
         if ($request->user()) {
             $hasAccess = $game->players()->where('user_id', $request->user()->id)->exists();
-        } else {
+        }
+
+        if (! $hasAccess) {
             $playerId = $request->session()->get("player_id.{$game->code}");
             $hasAccess = $playerId && $game->players()->where('id', $playerId)->exists();
         }

@@ -114,6 +114,21 @@ test('name cannot exceed 50 characters', function () {
     $response->assertSessionHasErrors('name');
 });
 
+test('authenticated user joining sets user_id on player record', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $game = Game::factory()->create(['status' => 'lobby']);
+
+    $response = $this->post("/join/{$game->code}", ['name' => 'Auth Player']);
+
+    $response->assertRedirect("/games/{$game->code}/lobby");
+
+    $player = Player::where('game_id', $game->id)->where('name', 'Auth Player')->first();
+    expect($player)->not->toBeNull();
+    expect($player->user_id)->toBe($user->id);
+});
+
 test('join is case-insensitive for the game code', function () {
     $game = Game::factory()->create(['status' => 'lobby', 'code' => 'ABC123']);
 
@@ -122,6 +137,31 @@ test('join is case-insensitive for the game code', function () {
     $response->assertRedirect('/games/ABC123/lobby');
 
     expect(Player::where('game_id', $game->id)->count())->toBe(1);
+});
+
+test('game exists endpoint returns true for valid game code', function () {
+    $game = Game::factory()->create(['status' => 'lobby']);
+
+    $response = $this->getJson("/games/{$game->code}/exists");
+
+    $response->assertOk();
+    $response->assertJson(['exists' => true]);
+});
+
+test('game exists endpoint returns false for unknown game code', function () {
+    $response = $this->getJson('/games/XXXXXX/exists');
+
+    $response->assertOk();
+    $response->assertJson(['exists' => false]);
+});
+
+test('game exists endpoint is case-insensitive', function () {
+    Game::factory()->create(['status' => 'lobby', 'code' => 'ABC123']);
+
+    $response = $this->getJson('/games/abc123/exists');
+
+    $response->assertOk();
+    $response->assertJson(['exists' => true]);
 });
 
 test('suggested name is a two-word animal combo', function () {
