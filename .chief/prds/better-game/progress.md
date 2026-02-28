@@ -99,5 +99,21 @@
   - Laravel `decimal(5,1)` supports up to 9999.9 — more than enough for 0-100.0 range. Use `decimal(6,1)` for cumulative player scores
   - When changing column types, use `->change()` in migrations with doctrine/dbal
   - `formatScore` utility with `toFixed(1)` ensures consistent "72.5" display rather than "72" or "72.50"
+- E2E tests: use `page.getByRole()` and `page.getByPlaceholder()` for element selection — avoid fragile CSS selectors
+- E2E tests: `loginAs(page, userId)` helper navigates to `/dev/login-as/{userId}` and waits for `/dashboard` redirect
+- E2E tests: global setup runs `migrate:fresh --seed` once — all test data comes from seeders, no per-test setup needed
   - Pre-existing BillingTest Stripe webhook failures (4 tests) are unrelated to game logic — ignore when validating changes
+---
+
+## 2026-02-27 - US-006
+- Enhanced `tests/e2e/smoke.spec.ts` to be a comprehensive homepage smoke test
+- Verifies page title ("How Does That Work?"), hero heading, nav links (Log in, Register), join game input/button, Host a Game CTA, and How to Play section
+- Test runs in ~414ms (well under the 5-second requirement)
+- Files changed: `tests/e2e/smoke.spec.ts`
+- **Learnings for future iterations:**
+  - The existing smoke test had `/Laravel/` as the title regex — the actual page title is "How Does That Work?"
+  - Use `page.getByRole('link', { name: '...' })` for nav links instead of fragile CSS selectors
+  - `page.getByPlaceholder('Game code')` reliably targets the join code input
+  - Playwright global setup seeds the database once before all tests — no per-test seeding needed
+  - The homepage renders for unauthenticated users with Log in/Register links; authenticated users see Dashboard instead
 ---
