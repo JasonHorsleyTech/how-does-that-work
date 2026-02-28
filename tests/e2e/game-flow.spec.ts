@@ -179,14 +179,50 @@ test('host reconnects from dashboard via Rejoin button', async ({ page }) => {
     await expectUrl(page, `/games/${CHOOSE_CODE}/play`);
 });
 
-test('guest player sees correct screen on refresh', async ({ page }) => {
-    // Join the round_complete game as a guest via dev route
-    await page.goto(`/dev/join-game/${ROUND_DONE_CODE}`);
-    // Dev route redirects to /lobby, middleware redirects to /round-complete
-    await expectUrl(page, `/games/${ROUND_DONE_CODE}/round-complete`);
+// Serial block: these tests share RNDDNE game state — guest refresh must run before starting next round
+test.describe.serial('round-done game (RNDDNE)', () => {
+    test('guest player sees correct screen on refresh', async ({ page }) => {
+        // Join the round_complete game as a guest via dev route
+        await page.goto(`/dev/join-game/${ROUND_DONE_CODE}`);
+        // Dev route redirects to /lobby, middleware redirects to /round-complete
+        await expectUrl(page, `/games/${ROUND_DONE_CODE}/round-complete`);
 
-    // Simulate a refresh by navigating to the wrong page
-    await page.goto(`/games/${ROUND_DONE_CODE}/lobby`);
-    // Middleware should redirect back to the correct screen
-    await expectUrl(page, `/games/${ROUND_DONE_CODE}/round-complete`);
+        // Simulate a refresh by navigating to the wrong page
+        await page.goto(`/games/${ROUND_DONE_CODE}/lobby`);
+        // Middleware should redirect back to the correct screen
+        await expectUrl(page, `/games/${ROUND_DONE_CODE}/round-complete`);
+    });
+
+    test('round complete page shows scores and host starts next round', async ({ page }) => {
+        await loginAs(page, HOST_ROUND_DONE);
+        await page.goto(`/games/${ROUND_DONE_CODE}/round-complete`);
+
+        const main = page.getByRole('main');
+
+        // Verify heading and round info
+        await expect(main.getByText('Round Complete!')).toBeVisible();
+        await expect(main.getByText('Round 1 of 2')).toBeVisible();
+
+        // Verify round results — both completed turns with topics
+        await expect(main.getByText('How does a microphone convert sound to electricity?')).toBeVisible();
+        await expect(main.getByText('How does a vacuum cleaner create suction?')).toBeVisible();
+
+        // Verify scoreboard with all 3 players (use exact match — names appear in both results and scoreboard)
+        await expect(main.getByText('Scoreboard')).toBeVisible();
+        await expect(main.getByText('Sneaky Raven', { exact: true })).toBeVisible();
+        await expect(main.getByText('Calm Panda', { exact: true })).toBeVisible();
+        await expect(main.getByText('Host Round Done')).toBeVisible();
+        await expect(main.getByText(/90.*pts/).first()).toBeVisible();
+        await expect(main.getByText(/70.*pts/).first()).toBeVisible();
+
+        // Verify "Start Round 2" button (not final round)
+        const startBtn = main.getByRole('button', { name: 'Start Round 2' });
+        await expect(startBtn).toBeVisible();
+
+        // Click to start the next round
+        await startBtn.click();
+
+        // Should redirect to /games/RNDDNE/play
+        await expectUrl(page, `/games/${ROUND_DONE_CODE}/play`);
+    });
 });

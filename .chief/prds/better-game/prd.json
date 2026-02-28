@@ -208,7 +208,7 @@
         "Test verifies navigation to the next game state"
       ],
       "priority": 7,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-016",
