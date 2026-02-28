@@ -157,7 +157,7 @@
         "Test verifies redirect to the play page (/games/READY1/play)"
       ],
       "priority": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-012",

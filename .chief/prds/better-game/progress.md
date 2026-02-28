@@ -17,6 +17,8 @@
 - Score display: use `formatScore()` from `resources/js/utils/formatScore.ts` for consistent decimal display (e.g., "72.5")
 - Grade derivation: `GradeTurn::gradeFromScore()` derives letter grades server-side (A: 90+, B: 80-89.9, C: 70-79.9, D: 60-69.9, F: <60)
 - Score fields are `decimal` in DB, cast to `'float'` in models — use `round(..., 1)` when storing
+- `.chief/` directory is in `.gitignore` — use `git add -f` to commit PRD changes
+- Many E2E tests were pre-written in bulk commit `56b65dc` — check `game-flow.spec.ts` before writing new tests
 
 ---
 
@@ -144,4 +146,40 @@
   - Guest lobby pages use `AuthBase` layout (no sidebar), so no need to scope assertions with `page.getByRole('main')` — unlike host pages
   - `page.getByLabel('Your display name')` reliably targets the name input on the Join page
   - The seeded LOBBY1 game already has 3 players (Host Standard, Quick Parrot, Sly Gecko) — the test adds a 4th
+---
+
+## 2026-02-27 - US-009
+- Verified existing "host starts submission phase from lobby" E2E test in `tests/e2e/game-flow.spec.ts` (line 62)
+- Test was already written in a previous bulk commit (`56b65dc`) — just needed validation and PRD marking
+- Test logs in as HOST_STANDARD (user 3), navigates to `/games/LOBBY1/lobby`, clicks "Start Submission Phase", verifies redirect to `/games/LOBBY1/submit`
+- All 14 E2E tests pass, test runs in ~421ms
+- Files changed: `.chief/prds/better-game/prd.json` (marked passes: true)
+- **Learnings for future iterations:**
+  - Several E2E tests were pre-written in bulk commit `56b65dc` — check if tests already exist before writing new ones
+  - The Lobby.vue `startSubmission()` function POSTs to `/games/{code}/start-submission` and Inertia handles the redirect
+  - `.chief/` directory is in `.gitignore` — use `git add -f` to commit PRD changes
+---
+
+## 2026-02-27 - US-010
+- Verified existing "host submits topics on submit page" E2E test in `tests/e2e/game-flow.spec.ts` (line 71)
+- Test was already written in a previous bulk commit (`56b65dc`) — just needed validation and PRD marking
+- Test logs in as HOST_SUBMITTING (user 6), navigates to `/games/SUBMIT/submit`, fills in 3 topic fields via `#topic-1`, `#topic-2`, `#topic-3`, clicks "Submit Topics", verifies staying on `/games/SUBMIT/submit` and "Topics submitted!" confirmation
+- All 14 E2E tests pass, test runs in ~448ms
+- Files changed: `.chief/prds/better-game/prd.json` (marked passes: true)
+- **Learnings for future iterations:**
+  - Topic inputs on the Submit page use IDs `#topic-1`, `#topic-2`, `#topic-3` — use `page.locator('#topic-N')` to target them
+  - After topic submission, the page stays on `/games/{code}/submit` with a "Topics submitted!" confirmation message
+  - The submitting game (SUBMIT) is seeded with HOST_SUBMITTING (user 6) who hasn't submitted topics yet — ideal for testing the submission flow
+---
+
+## 2026-02-27 - US-011
+- Verified existing "host starts game when all topics submitted" E2E test in `tests/e2e/game-flow.spec.ts` (line 88)
+- Test was already written in a previous bulk commit (`56b65dc`) — just needed validation and PRD marking
+- Test logs in as HOST_READY (user 7), navigates to `/games/READY1/submit`, clicks "Start Game", verifies redirect to `/games/READY1/play`
+- Test passes in ~420ms
+- Files changed: `.chief/prds/better-game/prd.json` (marked passes: true)
+- **Learnings for future iterations:**
+  - The READY1 game is seeded with status `submitting` and all 3 players having `has_submitted: true` — this makes the "Start Game" button visible
+  - The submit page for the host shows a "Start Game" button when all players have submitted their topics
+  - Another pre-written test from bulk commit `56b65dc` — always check existing tests first
 ---
