@@ -170,7 +170,7 @@
         "Test verifies the turn advances to the recording state (topic is shown, recording UI appears)"
       ],
       "priority": 7,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-013",

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { loginAs, expectUrl } from './helpers';
+import { loginAs, loginAsPlayer, expectUrl } from './helpers';
 
 // Deterministic user IDs after `migrate:fresh --seed`
 // (DatabaseSeeder creates test@example.com as ID 1, then DevSeeder creates dev users)
@@ -9,6 +9,9 @@ const HOST_READY = 7; // host-ready@dev.test — all-submitted game (READY1)
 const HOST_CHOOSING = 8; // host-choosing@dev.test — playing/choosing game (CHOOSE)
 const HOST_GRADING_DONE = 9; // host-grading-done@dev.test — grading_complete game (GRADED)
 const HOST_ROUND_DONE = 10; // host-round-done@dev.test — round_complete game (RNDDNE)
+
+// Deterministic player IDs from DevSeeder (guest players for login-as-player route)
+const CHOOSING_ACTIVE_PLAYER = 18; // Jolly Panda — active player on CHOOSE game (choosing state)
 
 // Deterministic game codes from DevSeeder
 const LOBBY_CODE = 'LOBBY1';
@@ -92,6 +95,28 @@ test('host starts game when all topics submitted', async ({ page }) => {
     await page.getByRole('button', { name: 'Start Game' }).click();
 
     await expectUrl(page, `/games/${READY_CODE}/play`);
+});
+
+test('active player chooses topic from options', async ({ page }) => {
+    // Log in as Jolly Panda — the active player in the choosing state on game CHOOSE
+    await loginAsPlayer(page, CHOOSING_ACTIVE_PLAYER);
+    await expectUrl(page, `/games/${CHOOSE_CODE}/play`);
+
+    // Verify the choosing UI is displayed
+    await expect(page.getByText("It's your turn!")).toBeVisible();
+    await expect(page.getByText('Choose the topic you\'d like to explain.')).toBeVisible();
+
+    // Verify topic choices are shown
+    await expect(page.getByText('How does a helicopter hover?')).toBeVisible();
+    await expect(page.getByText('How does a 3D printer build objects?')).toBeVisible();
+
+    // Click the first topic choice
+    await page.getByText('How does a helicopter hover?').click();
+
+    // After choosing, the turn advances to recording state
+    // The player should see "You chose:" and the selected topic
+    await expect(page.getByText('You chose:')).toBeVisible();
+    await expect(page.getByText('How does a helicopter hover?')).toBeVisible();
 });
 
 test('host advances turn from results page', async ({ page }) => {

@@ -11,6 +11,15 @@ export async function loginAs(page: Page, userId: number): Promise<void> {
 }
 
 /**
+ * Log in as a specific guest player via the dev login-as-player route.
+ * Navigates to /dev/login-as-player/{playerId} and waits for the redirect to the game page.
+ */
+export async function loginAsPlayer(page: Page, playerId: number): Promise<void> {
+    await page.goto(`/dev/login-as-player/${playerId}`);
+    await page.waitForURL('**/games/**');
+}
+
+/**
  * Assert the current page URL path matches the given pattern.
  * For string paths, converts to a regex so it's protocol-agnostic (http vs https).
  */
