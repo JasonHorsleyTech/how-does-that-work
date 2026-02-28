@@ -275,6 +275,17 @@ test.describe.serial('round-done game (RNDDNE)', () => {
     });
 });
 
+test('state redirect middleware redirects host from wrong phase to correct page', async ({ page }) => {
+    // Log in as HOST_LOADED who hosts the PLAYNG game (status: playing)
+    await loginAs(page, HOST_LOADED);
+
+    // Manually navigate to /lobby — the wrong phase for a playing game
+    await page.goto(`/games/${PLAYING_CODE}/lobby`);
+
+    // Middleware should redirect to the correct page (/play)
+    await expectUrl(page, `/games/${PLAYING_CODE}/play`);
+});
+
 test('completed game shows final rankings, turn results, and play again', async ({ page }) => {
     await loginAs(page, HOST_VETERAN);
     await page.goto(`/games/${COMPLETE_CODE}/complete`);

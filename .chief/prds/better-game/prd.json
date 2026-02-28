@@ -260,7 +260,7 @@
         "Test verifies automatic redirect to the correct page (/games/{code}/play)"
       ],
       "priority": 8,
-      "passes": false
+      "passes": true
     }
   ]
 }

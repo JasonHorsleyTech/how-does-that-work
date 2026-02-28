@@ -284,6 +284,19 @@
   - Guest player session is stored server-side via `session()->put("player_id.{code}", playerId)` — `page.reload()` preserves the session cookie so reconnection works
 ---
 
+## 2026-02-27 - US-019
+- Added "state redirect middleware redirects host from wrong phase to correct page" E2E test in `tests/e2e/game-flow.spec.ts`
+- Test logs in as HOST_LOADED (user 2) who hosts the PLAYNG game (status: playing)
+- Navigates to `/games/PLAYNG/lobby` (wrong phase for a playing game)
+- Verifies automatic redirect to `/games/PLAYNG/play` (correct page)
+- All 21 E2E tests pass (20 passed + 1 pre-existing race condition in "guest joins game" due to parallel test modifying LOBBY1 state)
+- Files changed: `tests/e2e/game-flow.spec.ts`, `.chief/prds/better-game/prd.json`
+- **Learnings for future iterations:**
+  - The state redirect middleware (`RedirectToGameState`) works for both hosts and guests — it checks the game's current status and redirects to the correct URL
+  - HOST_LOADED (user 2) + PLAYNG game is the simplest host+playing combination for testing state redirects
+  - Pre-existing race condition: "guest joins game" (LOBBY1) and "host starts submission phase" (LOBBY1) can conflict when running in parallel — these should ideally be in a `test.describe.serial` block
+---
+
 ## 2026-02-27 - US-018
 - Added "host dashboard shows active games with code, status, and rejoin link" E2E test in `tests/e2e/game-flow.spec.ts`
 - Test logs in as HOST_LOADED (user 2) who hosts the PLAYNG game (status: playing)
