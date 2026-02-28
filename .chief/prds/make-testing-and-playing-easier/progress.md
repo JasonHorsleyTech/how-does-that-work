@@ -8,6 +8,7 @@
 - TypeScript check uses `npx vue-tsc --noEmit`
 - Topic validation is inline in `TopicController::store()` (not a form request)
 - `Submit.vue` has two duplicate form templates (host view + guest view) — changes must be applied to both
+- `Lobby.vue` also has host/guest views — host view has the start button and QR code, guest view is a simple waiting page
 
 ---
 
@@ -32,4 +33,16 @@
   - Topic validation is in `TopicController::store()` — not a form request, just inline `$request->validate()`
   - Frontend has two duplicate form templates in Submit.vue: one for host (with AppLayout) and one for guest (simple page) — both need updating for any form changes
   - The `minlength` HTML attribute provides client-side validation alongside the server-side Laravel `min:` rule
+---
+
+## 2026-02-27 - US-003
+- What was implemented: Removed the minimum player requirement (2 non-host players) to start a game, allowing the host to start solo or with any number of players
+- Files changed:
+  - `app/Http/Controllers/GameController.php` — removed `$nonHostCount < 2` validation check in `startSubmission()`
+  - `resources/js/pages/games/Lobby.vue` — removed `canStart` computed property, removed `:disabled="!canStart"` from Start button, removed "Waiting for at least 2 players to join…" message, cleaned up unused `computed` import
+  - `tests/Feature/TopicSubmissionTest.php` — replaced "cannot start with fewer than 2" test with two new tests: "can start solo with 0 non-host players" and "can start with 1 non-host player"
+- **Learnings for future iterations:**
+  - `Lobby.vue` has two views: host view (with AppLayout, start button, QR code) and guest view (simple waiting page) — only the host view has the start button
+  - The `startSubmission()` backend method is in `GameController`, not a separate controller
+  - Player polling endpoint (`/games/{code}/players`) returns `nonHostCount` — this is still sent but no longer used for gating; could be cleaned up if no longer needed elsewhere
 ---
