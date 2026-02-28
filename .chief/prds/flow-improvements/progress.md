@@ -101,3 +101,20 @@
   - The `@see \Laravel\Fortify\...` references in route TS files are code comments (auto-generated PHP class references), not user-visible text — these are fine to leave
   - Auth pages already use generic text/labels from shadcn-vue components, no Laravel branding
 ---
+
+## 2026-02-28 - US-007
+- Added credit balance display to the Profile settings page
+- Added `credits: number` field to the TypeScript `User` type in `resources/js/types/auth.ts`
+- Added "Game credits" section to `resources/js/pages/settings/Profile.vue` between the profile form and delete account sections
+- Credit balance shows prominently in 3xl bold text with "Available Credits" label
+- Zero credits are highlighted in destructive (red) color with explicit "You're out of credits" message
+- "Buy more credits" button links to the existing `/billing` page
+- No backend changes needed — `credits` field was already serialized via `$request->user()` in Inertia shared data (not in User model's `$hidden`)
+- Files changed: `resources/js/pages/settings/Profile.vue`, `resources/js/types/auth.ts`
+- **Learnings for future iterations:**
+  - The `User` model's `$hidden` array controls what fields are excluded from serialization — `credits` was NOT hidden, so it was already available via `auth.user` in Inertia props
+  - The TypeScript `User` type has `[key: string]: unknown` so extra fields work at runtime, but adding explicit fields provides better type safety
+  - The `billing` route helper is exported from `@/routes` (index.ts) — auto-generated wayfinder routes
+  - The settings Profile page uses `SettingsLayout` which provides sidebar nav and content area; sections within the slot are separated by the `space-y-12` on the parent `<section>` element
+  - The Billing page already exists at `/billing` with full credit display and Stripe purchase flow — Profile page just needs a summary + link
+---
