@@ -121,7 +121,7 @@
         "Test verifies the new player appears in the player list or that the lobby page loads correctly"
       ],
       "priority": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-009",

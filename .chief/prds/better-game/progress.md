@@ -99,6 +99,7 @@
   - Laravel `decimal(5,1)` supports up to 9999.9 — more than enough for 0-100.0 range. Use `decimal(6,1)` for cumulative player scores
   - When changing column types, use `->change()` in migrations with doctrine/dbal
   - `formatScore` utility with `toFixed(1)` ensures consistent "72.5" display rather than "72" or "72.50"
+- E2E tests: headless Chromium auto-grants `getUserMedia` — mic permission denial flow does NOT trigger in Playwright
 - E2E tests: use `page.getByRole()` and `page.getByPlaceholder()` for element selection — avoid fragile CSS selectors
 - E2E tests: `loginAs(page, userId)` helper navigates to `/dev/login-as/{userId}` and waits for `/dashboard` redirect
 - E2E tests: global setup runs `migrate:fresh --seed` once — all test data comes from seeders, no per-test setup needed
@@ -131,4 +132,16 @@
   - When host pages use `AppLayout`, the user's name appears in both the sidebar and main content — use `page.getByRole('main')` to scope assertions to the player list
   - `text=/^[A-Z0-9]{5,6}$/` regex locator works well for matching dynamically generated game codes
   - The "Create Game" form defaults to 1 round — no need to explicitly select a radio button for the basic flow
+---
+
+## 2026-02-27 - US-008
+- Added "guest joins game via join page" E2E test in `tests/e2e/game-flow.spec.ts`
+- Test navigates to `/join/LOBBY1`, fills in the display name "Eager Dolphin", clicks "Join Game", verifies redirect to `/games/LOBBY1/lobby`, and confirms the player name appears in the player list
+- Also verifies the "Waiting for host to start" message is visible (guest view)
+- Files changed: `tests/e2e/game-flow.spec.ts`
+- **Learnings for future iterations:**
+  - Headless Chromium auto-grants `getUserMedia` permissions — the mic permission flow (deny → "Join Anyway") does NOT trigger in Playwright tests. The form submits directly after a single click
+  - Guest lobby pages use `AuthBase` layout (no sidebar), so no need to scope assertions with `page.getByRole('main')` — unlike host pages
+  - `page.getByLabel('Your display name')` reliably targets the name input on the Join page
+  - The seeded LOBBY1 game already has 3 players (Host Standard, Quick Parrot, Sly Gecko) — the test adds a 4th
 ---

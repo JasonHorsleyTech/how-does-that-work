@@ -41,6 +41,24 @@ test('host creates a new game from dashboard', async ({ page }) => {
     await expect(main.getByText('Host', { exact: true })).toBeVisible();
 });
 
+test('guest joins game via join page', async ({ page }) => {
+    // Navigate to the public join page for the seeded lobby game
+    await page.goto(`/join/${LOBBY_CODE}`);
+
+    // Enter a display name and submit
+    await page.getByLabel('Your display name').fill('Eager Dolphin');
+    await page.getByRole('button', { name: 'Join Game' }).click();
+
+    // Should redirect to the lobby page
+    await expectUrl(page, `/games/${LOBBY_CODE}/lobby`);
+
+    // The guest player's name should appear in the player list
+    await expect(page.getByText('Eager Dolphin')).toBeVisible();
+
+    // Lobby page should show the guest is waiting for host
+    await expect(page.getByText('Waiting for host to start')).toBeVisible();
+});
+
 test('host starts submission phase from lobby', async ({ page }) => {
     await loginAs(page, HOST_STANDARD);
     await page.goto(`/games/${LOBBY_CODE}/lobby`);
