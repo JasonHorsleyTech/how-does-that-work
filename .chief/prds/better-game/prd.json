@@ -248,7 +248,7 @@
         "Test clicks \"Rejoin\" and verifies redirect to the correct game page"
       ],
       "priority": 8,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-019",

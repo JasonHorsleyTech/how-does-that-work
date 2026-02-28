@@ -3,6 +3,7 @@ import { loginAs, loginAsPlayer, expectUrl } from './helpers';
 
 // Deterministic user IDs after `migrate:fresh --seed`
 // (DatabaseSeeder creates test@example.com as ID 1, then DevSeeder creates dev users)
+const HOST_LOADED = 2; // host-loaded@dev.test — playing game (PLAYNG)
 const HOST_STANDARD = 3; // host-standard@dev.test — lobby game (LOBBY1)
 const HOST_SUBMITTING = 6; // host-submitting@dev.test — submitting game (SUBMIT)
 const HOST_READY = 7; // host-ready@dev.test — all-submitted game (READY1)
@@ -181,6 +182,29 @@ test('host reconnects from dashboard via Rejoin button', async ({ page }) => {
     await rejoinLink.click();
 
     await expectUrl(page, `/games/${CHOOSE_CODE}/play`);
+});
+
+test('host dashboard shows active games with code, status, and rejoin link', async ({ page }) => {
+    await loginAs(page, HOST_LOADED);
+
+    const main = page.getByRole('main');
+
+    // Verify the dashboard heading
+    await expect(main.getByText('Your Games')).toBeVisible();
+
+    // Verify the PLAYNG game is listed with its code
+    await expect(main.getByText('PLAYNG')).toBeVisible();
+
+    // Verify the status badge shows "In Progress" (playing status)
+    await expect(main.getByText('In Progress')).toBeVisible();
+
+    // Verify the Rejoin link is present
+    const rejoinLink = main.getByRole('link', { name: 'Rejoin' });
+    await expect(rejoinLink).toBeVisible();
+
+    // Click Rejoin and verify redirect to the correct game page
+    await rejoinLink.click();
+    await expectUrl(page, `/games/${PLAYING_CODE}/play`);
 });
 
 test('guest player reconnects after page refresh', async ({ page }) => {

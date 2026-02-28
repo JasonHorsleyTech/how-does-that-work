@@ -25,6 +25,7 @@
 - E2E text that appears in both content and breadcrumbs/sidebar: use `{ exact: true }` or CSS selectors to avoid strict mode violations
 - E2E tests that modify shared DB state (e.g., clicking "Start Round 2") must use `test.describe.serial` with dependent tests to prevent parallel execution conflicts
 - Playwright config has `fullyParallel: true` — tests within the same file run in parallel unless wrapped in `test.describe.serial`
+- Playwright config uses `--use-fake-device-for-media-stream` Chromium flag so `getUserMedia` succeeds in headless mode (no real audio device)
 
 ---
 
@@ -281,4 +282,19 @@
   - The PLAYNG game is safe for parallel tests — no other test modifies its state
   - Use `/is choosing their topic/` regex for the non-active player assertion since the active player name may vary
   - Guest player session is stored server-side via `session()->put("player_id.{code}", playerId)` — `page.reload()` preserves the session cookie so reconnection works
+---
+
+## 2026-02-27 - US-018
+- Added "host dashboard shows active games with code, status, and rejoin link" E2E test in `tests/e2e/game-flow.spec.ts`
+- Test logs in as HOST_LOADED (user 2) who hosts the PLAYNG game (status: playing)
+- Verifies: "Your Games" heading, game code "PLAYNG" displayed in the table, status badge "In Progress"
+- Verifies "Rejoin" link is present, clicks it, and confirms redirect to `/games/PLAYNG/play`
+- Also fixed pre-existing "guest joins game" test failure by adding `--use-fake-device-for-media-stream` Chromium flag to `playwright.config.ts` — headless Chromium has no audio device, so `getUserMedia` was throwing `NotFoundError` instead of succeeding
+- All 20 E2E tests pass in ~5.9s
+- Files changed: `tests/e2e/game-flow.spec.ts`, `playwright.config.ts`, `.chief/prds/better-game/prd.json`
+- **Learnings for future iterations:**
+  - User 2 (HOST_LOADED) hosts the PLAYNG game — good for dashboard tests since it has an active game with a Rejoin link
+  - Dashboard displays game code in monospace, status as a badge (e.g., "In Progress" for playing), and a "Rejoin" link for non-complete games
+  - Headless Chromium needs `--use-fake-device-for-media-stream` in launchOptions for `getUserMedia` to succeed — without it, `NotFoundError` is thrown (no audio device available)
+  - The `--use-fake-device-for-media-stream` flag provides a fake audio stream so `getUserMedia` succeeds silently — this is the correct approach for E2E tests that involve mic access
 ---
