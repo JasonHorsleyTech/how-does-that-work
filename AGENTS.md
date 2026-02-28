@@ -32,18 +32,7 @@ The host buys tokens via Stripe, which fund OpenAI API calls. Whisper transcribe
 - **SSL**: Let's Encrypt via Certbot, auto-renewing
 - **Infrastructure is managed from the local machine** via AWS CLI (already authenticated) and Claude. The EC2 instance itself does not have AWS CLI — SSM secrets are fetched from the local machine and deployed.
 - **Deploy path**: `/var/www/lordoftongs`
-- **SSH access**: Use EC2 Instance Connect (no permanent SSH key required). Generate a temp key, push it, and connect:
-  ```bash
-  ssh-keygen -t rsa -b 2048 -f /tmp/ec2-temp-key -N "" -q
-  aws ec2-instance-connect send-ssh-public-key \
-    --instance-id i-02155d7de13125a95 \
-    --instance-os-user ubuntu \
-    --ssh-public-key file:///tmp/ec2-temp-key.pub \
-    --region us-east-1
-  ssh -i /tmp/ec2-temp-key -o StrictHostKeyChecking=no ubuntu@18.213.144.0
-  rm /tmp/ec2-temp-key /tmp/ec2-temp-key.pub  # clean up after
-  ```
-  The temp key is valid for ~60 seconds, so connect immediately after pushing it.
+- **SSH access**: `ssh -i ~/.ssh/lordoftongs-prod ubuntu@18.213.144.0`
 - **Merge-to-main hooks** handle deployment to the EC2 instance.
 
 ## Key Features Requiring Special APIs
