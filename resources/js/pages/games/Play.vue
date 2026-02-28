@@ -502,8 +502,8 @@ async function pollState() {
 <template>
     <Head :title="`Game — ${game.code}`" />
 
-    <!-- Host view: full app layout with sidebar -->
-    <AppLayout v-if="player.is_host" :breadcrumbs="breadcrumbs">
+    <!-- Host view: full app layout with sidebar (only when observing, not when it's the host's turn) -->
+    <AppLayout v-if="player.is_host && !isActivePlayer" :breadcrumbs="breadcrumbs">
         <div class="flex flex-1 flex-col items-center justify-center p-6">
             <div class="w-full max-w-xl space-y-6">
                 <div class="text-center">

@@ -12,7 +12,7 @@ class TurnAssignmentService
      * Generate turn records for a game when it transitions to 'playing'.
      *
      * For each round:
-     *   - Non-host players are shuffled to determine turn order.
+     *   - All players (including the host) are shuffled to determine turn order.
      *   - Each player receives up to 2 topic choices: topics they did not submit,
      *     and not already claimed by another turn in this generation pass.
      *   - If 0 eligible topics remain for a player, that player's turn is skipped.
@@ -23,7 +23,6 @@ class TurnAssignmentService
     public function assignTurns(Game $game): void
     {
         $players = $game->players()
-            ->where('is_host', false)
             ->get()
             ->shuffle()
             ->values();
