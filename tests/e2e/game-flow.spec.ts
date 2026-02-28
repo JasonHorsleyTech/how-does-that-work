@@ -9,6 +9,7 @@ const HOST_READY = 7; // host-ready@dev.test — all-submitted game (READY1)
 const HOST_CHOOSING = 8; // host-choosing@dev.test — playing/choosing game (CHOOSE)
 const HOST_GRADING_DONE = 9; // host-grading-done@dev.test — grading_complete game (GRADED)
 const HOST_ROUND_DONE = 10; // host-round-done@dev.test — round_complete game (RNDDNE)
+const HOST_VETERAN = 5; // host-veteran@dev.test — completed game (COMPLT)
 
 // Deterministic player IDs from DevSeeder (guest players for login-as-player route)
 const CHOOSING_ACTIVE_PLAYER = 18; // Jolly Panda — active player on CHOOSE game (choosing state)
@@ -20,6 +21,7 @@ const READY_CODE = 'READY1';
 const CHOOSE_CODE = 'CHOOSE';
 const GRADED_CODE = 'GRADED';
 const ROUND_DONE_CODE = 'RNDDNE';
+const COMPLETE_CODE = 'COMPLT';
 
 test('host creates a new game from dashboard', async ({ page }) => {
     await loginAs(page, HOST_STANDARD);
@@ -225,4 +227,39 @@ test.describe.serial('round-done game (RNDDNE)', () => {
         // Should redirect to /games/RNDDNE/play
         await expectUrl(page, `/games/${ROUND_DONE_CODE}/play`);
     });
+});
+
+test('completed game shows final rankings, turn results, and play again', async ({ page }) => {
+    await loginAs(page, HOST_VETERAN);
+    await page.goto(`/games/${COMPLETE_CODE}/complete`);
+
+    const main = page.getByRole('main');
+
+    // Verify winner banner — Rapid Owl has the highest score (92)
+    await expect(main.getByText(/Rapid Owl.*wins/)).toBeVisible();
+
+    // Verify Final Scores section with all 3 players ranked by score
+    await expect(main.getByText('Final Scores')).toBeVisible();
+    await expect(main.getByText('Rapid Owl', { exact: true })).toBeVisible();
+    await expect(main.getByText('Host Veteran', { exact: true }).first()).toBeVisible();
+    await expect(main.getByText('Gentle Moose', { exact: true })).toBeVisible();
+    await expect(main.getByText(/92.*pts/).first()).toBeVisible();
+    await expect(main.getByText(/85.*pts/).first()).toBeVisible();
+    await expect(main.getByText(/67.*pts/).first()).toBeVisible();
+
+    // Verify Turn History section with individual turn results
+    await expect(main.getByText('Turn History')).toBeVisible();
+
+    // Verify topics from the completed turns
+    await expect(main.getByText('How does a steam engine work?')).toBeVisible();
+    await expect(main.getByText('How does a battery store electricity?')).toBeVisible();
+    await expect(main.getByText('How does a vaccine teach the immune system?')).toBeVisible();
+
+    // Verify grades are displayed (A, B, D)
+    await expect(main.getByText('A', { exact: true })).toBeVisible();
+    await expect(main.getByText('B', { exact: true })).toBeVisible();
+    await expect(main.getByText('D', { exact: true })).toBeVisible();
+
+    // Verify "Play Again" button is present
+    await expect(main.getByRole('button', { name: 'Play Again' })).toBeVisible();
 });

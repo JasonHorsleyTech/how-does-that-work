@@ -222,7 +222,7 @@
         "Test verifies a \"Play Again\" button is present"
       ],
       "priority": 7,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-017",

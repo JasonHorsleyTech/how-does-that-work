@@ -23,6 +23,8 @@
 - Player IDs are deterministic: Lobby 1-3, Playing 4-7, Completed 8-10, Submitting 11-13, Ready 14-16, Choosing 17-19, Graded 20-22, RoundDone 23-25
 - E2E score assertions: use regex like `/82.*\/100/` instead of exact strings — score may render as "82" or "82.0" depending on build state
 - E2E text that appears in both content and breadcrumbs/sidebar: use `{ exact: true }` or CSS selectors to avoid strict mode violations
+- E2E tests that modify shared DB state (e.g., clicking "Start Round 2") must use `test.describe.serial` with dependent tests to prevent parallel execution conflicts
+- Playwright config has `fullyParallel: true` — tests within the same file run in parallel unless wrapped in `test.describe.serial`
 
 ---
 
@@ -217,4 +219,50 @@
   - Score display may vary between "82" and "82.0" depending on whether Vite dev server is running (production build vs dev) — use regex `/82.*\/100/` for resilient matching
   - The GRADED game redirects host from `/play` to `/results/{turnId}` via state middleware — use `toHaveURL(regex)` to match the dynamic turn ID
   - Scoping to `page.getByRole('main')` is essential on host pages to avoid matching sidebar elements
+---
+
+## 2026-02-27 - US-014
+- Verified existing "host advances turn from results page" E2E test in `tests/e2e/game-flow.spec.ts` (line 159)
+- Test was already written in a previous bulk commit (`56b65dc`) — just needed validation and PRD marking
+- Test logs in as HOST_GRADING_DONE (user 9), navigates to `/games/GRADED/play` (middleware redirects to results page), clicks "Next Player →", verifies redirect back to `/games/GRADED/play` for the next turn
+- The `advanceToNext()` function POSTs to `/games/{code}/advance` which advances the turn and redirects back to `/play`
+- All 16 E2E tests pass in ~5.5s
+- Files changed: `.chief/prds/better-game/prd.json` (marked passes: true)
+- **Learnings for future iterations:**
+  - Another pre-written test from bulk commit `56b65dc` — always check if tests already exist before writing new ones
+  - The "Next Player →" button text includes the arrow Unicode character — use `{ name: 'Next Player →' }` in `getByRole('button')`
+  - After advancing, the URL stays at `/games/{code}/play` — the middleware then redirects to the appropriate state (choosing, results, round-complete, etc.)
+---
+
+## 2026-02-27 - US-015
+- Added "round complete page shows scores and host starts next round" E2E test in `tests/e2e/game-flow.spec.ts`
+- Test logs in as HOST_ROUND_DONE (user 10), navigates to `/games/RNDDNE/round-complete`
+- Verifies: "Round Complete!" heading, "Round 1 of 2" round info, both completed turn topics, scoreboard with all 3 players (Calm Panda 90pts, Sneaky Raven 70pts, Host Round Done 0pts)
+- Verifies "Start Round 2" button (game has max_rounds=2, current_round=1)
+- Clicks "Start Round 2" and verifies redirect to `/games/RNDDNE/play`
+- Wrapped RNDDNE-dependent tests in `test.describe.serial` block to prevent parallel execution conflicts — guest refresh test must run before the round complete test (which modifies game state)
+- All 17 E2E tests pass in ~5.6s
+- Files changed: `tests/e2e/game-flow.spec.ts`, `.chief/prds/better-game/prd.json`
+- **Learnings for future iterations:**
+  - Player names appearing in both round results and scoreboard cause strict mode violations — use `{ exact: true }` on player name assertions
+  - Tests that modify shared game state (e.g., clicking "Start Round 2" changes RNDDNE from `round_complete` to `playing`) break other tests that depend on the original state. Use `test.describe.serial` to enforce ordering
+  - Score `pts` values appear in both results section and scoreboard — use `.first()` on regex matchers like `/90.*pts/` to avoid strict mode violations
+  - The `fullyParallel: true` Playwright config means tests within the same file can run in any order — always consider shared database state when writing state-modifying tests
+---
+
+## 2026-02-27 - US-016
+- Added "completed game shows final rankings, turn results, and play again" E2E test in `tests/e2e/game-flow.spec.ts`
+- Test logs in as HOST_VETERAN (user 5), navigates to `/games/COMPLT/complete`
+- Verifies: winner banner ("Rapid Owl wins"), Final Scores section with all 3 players ranked (Rapid Owl 92pts, Host Veteran 85pts, Gentle Moose 67pts)
+- Verifies Turn History with all 3 topics ("How does a steam engine work?", "How does a battery store electricity?", "How does a vaccine teach the immune system?")
+- Verifies grade badges (A, B, D) are displayed
+- Verifies "Play Again" button is present
+- Does not click "Play Again" to avoid modifying shared DB state (creates a new game)
+- All 18 E2E tests pass in ~5.3s
+- Files changed: `tests/e2e/game-flow.spec.ts`, `.chief/prds/better-game/prd.json`
+- **Learnings for future iterations:**
+  - The COMPLT game is seeded with HOST_VETERAN (user 5) as host, Rapid Owl (92, A), Gentle Moose (67, D), and Host Veteran (85, B)
+  - Player names appear in both Final Scores and Turn History sections — use `{ exact: true }` and `.first()` to avoid strict mode violations
+  - The completed game test does NOT need `test.describe.serial` since it doesn't modify game state (doesn't click "Play Again")
+  - Winner banner text uses interpolation like "Rapid Owl wins with 92.0 points!" — match with regex `/Rapid Owl.*wins/` to be flexible
 ---
