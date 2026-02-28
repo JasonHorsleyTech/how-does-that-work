@@ -82,3 +82,22 @@
   - Welcome.vue uses shadcn-vue Input/Button components — `border-destructive` class works for error styling on Input
   - The `watch` on `joinCode` to clear errors is a simple pattern for "error disappears when user starts typing"
 ---
+
+## 2026-02-28 - US-006
+- Removed all Laravel Starter Kit branding from the application
+- AppLogo.vue: Changed "Laravel Starter Kit" text to "How Does That Work?"
+- AppSidebar.vue: Removed footer nav items linking to Laravel GitHub repo and Laravel docs, removed NavFooter component usage
+- AppHeader.vue: Removed rightNavItems (Repository + Documentation links to Laravel), removed Search button, removed Tooltip imports, removed `toUrl` import
+- app.blade.php: Changed fallback title from 'Laravel' to 'How Does That Work?'
+- app.ts + ssr.ts: Changed VITE_APP_NAME fallback from 'Laravel' to 'How Does That Work?'
+- .env.example: Changed APP_NAME from 'Laravel' to 'How Does That Work?'
+- .env (local only, gitignored): Changed APP_NAME from 'Laravel' to 'How Does That Work?'
+- Auth pages (Login, Register, ForgotPassword, ResetPassword) were already clean — no Laravel branding found
+- Files changed: `.env.example`, `resources/js/app.ts`, `resources/js/ssr.ts`, `resources/js/components/AppLogo.vue`, `resources/js/components/AppHeader.vue`, `resources/js/components/AppSidebar.vue`, `resources/views/app.blade.php`
+- **Learnings for future iterations:**
+  - Laravel Starter Kit branding lives in 3 main places: AppLogo.vue (sidebar text), AppSidebar.vue (footer links), AppHeader.vue (right nav links + search icon)
+  - The `.env` file sets `APP_NAME` which propagates via `VITE_APP_NAME` to frontend and via `config('app.name')` to Blade templates — changing .env is the foundational fix
+  - `.env` is gitignored; `.env.example` is tracked and should be kept in sync
+  - The `@see \Laravel\Fortify\...` references in route TS files are code comments (auto-generated PHP class references), not user-visible text — these are fine to leave
+  - Auth pages already use generic text/labels from shadcn-vue components, no Laravel branding
+---
