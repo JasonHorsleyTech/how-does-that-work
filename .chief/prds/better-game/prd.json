@@ -195,7 +195,7 @@
         "Test verifies navigation to the play page for the next turn"
       ],
       "priority": 7,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-015",
