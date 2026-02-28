@@ -66,3 +66,19 @@
   - The `micDenied` state + "Join Anyway" flow was the old approach to handling mic denial; the new approach is simply to explain upfront and defer the actual permission prompt
   - The mic explanation text uses `text-muted-foreground` class for subtle styling consistent with the rest of the AuthBase layout
 ---
+
+## 2026-02-28 - US-005
+- Added inline error for invalid game codes on the home page instead of navigating to a 404
+- Backend: Added `GameController::exists()` endpoint at `GET /games/{code}/exists` returning `{ exists: true/false }`
+- Frontend: Updated `Welcome.vue` to validate game code via fetch to the exists endpoint before navigating
+- Inline error displays in `text-destructive` below the join input with `border-destructive` on the input
+- Error clears automatically when user types a new code (via `watch` on `joinCode`)
+- Join button shows "Checking..." and is disabled during the API call
+- Added 3 tests: valid code returns true, unknown code returns false, case-insensitive lookup
+- Files changed: `app/Http/Controllers/GameController.php`, `routes/web.php`, `resources/js/pages/Welcome.vue`, `tests/Feature/JoinTest.php`
+- **Learnings for future iterations:**
+  - The existing join flow used `router.visit()` which navigates away immediately — replacing with `fetch()` + conditional `router.visit()` prevents the 404 flash
+  - The `/games/{code}/exists` endpoint is public (no auth required) since anyone on the home page needs to check codes
+  - Welcome.vue uses shadcn-vue Input/Button components — `border-destructive` class works for error styling on Input
+  - The `watch` on `joinCode` to clear errors is a simple pattern for "error disappears when user starts typing"
+---
