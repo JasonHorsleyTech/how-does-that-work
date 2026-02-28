@@ -171,7 +171,7 @@ test('player cannot submit topics more than once', function () {
     $this->assertDatabaseCount('topics', 0);
 });
 
-test('topics must be between 5 and 120 characters', function () {
+test('topics must be between 1 and 120 characters', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
 
@@ -180,7 +180,7 @@ test('topics must be between 5 and 120 characters', function () {
 
     $response = $this->post(route('games.topics.store', ['code' => $game->code]), [
         'topics' => [
-            'Hi',
+            '',
             str_repeat('x', 121),
             'How does a pipe organ work?',
         ],

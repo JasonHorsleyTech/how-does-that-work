@@ -158,7 +158,7 @@ async function pollStatus() {
                                     v-model="form.topics[n - 1]"
                                     type="text"
                                     required
-                                    minlength="5"
+                                    minlength="1"
                                     maxlength="120"
                                     placeholder="How does a microwave work?"
                                 />
@@ -321,7 +321,7 @@ async function pollStatus() {
                         v-model="form.topics[n - 1]"
                         type="text"
                         required
-                        minlength="5"
+                        minlength="1"
                         maxlength="120"
                         placeholder="How does a microwave work?"
                     />

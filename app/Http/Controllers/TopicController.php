@@ -68,7 +68,7 @@ class TopicController extends Controller
 
         $validated = $request->validate([
             'topics' => ['required', 'array', 'size:3'],
-            'topics.*' => ['required', 'string', 'min:5', 'max:120'],
+            'topics.*' => ['required', 'string', 'min:1', 'max:120'],
         ]);
 
         foreach ($validated['topics'] as $text) {
