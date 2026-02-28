@@ -18,6 +18,29 @@ const CHOOSE_CODE = 'CHOOSE';
 const GRADED_CODE = 'GRADED';
 const ROUND_DONE_CODE = 'RNDDNE';
 
+test('host creates a new game from dashboard', async ({ page }) => {
+    await loginAs(page, HOST_STANDARD);
+
+    // Click "Host a Game" from the dashboard
+    await page.getByRole('link', { name: 'Host a Game' }).click();
+    await expect(page).toHaveURL(/\/games\/create/);
+
+    // Select 1 round and create the game
+    await page.getByRole('button', { name: 'Create Game' }).click();
+
+    // Should redirect to the lobby page with a game code
+    await expect(page).toHaveURL(/\/games\/[A-Z0-9]+\/lobby/);
+
+    // Game code should be displayed prominently
+    const gameCode = page.locator('text=/^[A-Z0-9]{5,6}$/');
+    await expect(gameCode).toBeVisible();
+
+    // Host should appear in the player list (scope to main content to avoid sidebar match)
+    const main = page.getByRole('main');
+    await expect(main.getByText('Host Standard')).toBeVisible();
+    await expect(main.getByText('Host', { exact: true })).toBeVisible();
+});
+
 test('host starts submission phase from lobby', async ({ page }) => {
     await loginAs(page, HOST_STANDARD);
     await page.goto(`/games/${LOBBY_CODE}/lobby`);

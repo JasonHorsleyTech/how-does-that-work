@@ -102,6 +102,8 @@
 - E2E tests: use `page.getByRole()` and `page.getByPlaceholder()` for element selection — avoid fragile CSS selectors
 - E2E tests: `loginAs(page, userId)` helper navigates to `/dev/login-as/{userId}` and waits for `/dashboard` redirect
 - E2E tests: global setup runs `migrate:fresh --seed` once — all test data comes from seeders, no per-test setup needed
+- E2E tests: `expectUrl()` helper uses regex matching to be protocol-agnostic (Herd serves HTTPS but Playwright baseURL is HTTP)
+- E2E tests: scope element assertions to `page.getByRole('main')` to avoid matching sidebar elements (e.g., user name appears in both sidebar and main content)
   - Pre-existing BillingTest Stripe webhook failures (4 tests) are unrelated to game logic — ignore when validating changes
 ---
 
@@ -116,4 +118,17 @@
   - `page.getByPlaceholder('Game code')` reliably targets the join code input
   - Playwright global setup seeds the database once before all tests — no per-test seeding needed
   - The homepage renders for unauthenticated users with Log in/Register links; authenticated users see Dashboard instead
+---
+
+## 2026-02-27 - US-007
+- Added "host creates a new game from dashboard" E2E test in `tests/e2e/game-flow.spec.ts`
+- Test logs in as HOST_STANDARD (user 3), clicks "Host a Game" from dashboard, clicks "Create Game", verifies lobby redirect with game code and host in player list
+- Fixed `expectUrl()` helper in `tests/e2e/helpers.ts` — was doing exact string match which broke on http/https mismatch (Herd serves HTTPS but Playwright baseURL is HTTP). Now converts string paths to regex for protocol-agnostic matching
+- This fix also resolved 6 pre-existing test failures in game-flow.spec.ts (all had the same http/https mismatch)
+- Files changed: `tests/e2e/game-flow.spec.ts`, `tests/e2e/helpers.ts`
+- **Learnings for future iterations:**
+  - The `expectUrl` helper had a latent bug: Herd serves over HTTPS but Playwright's `baseURL` is `http://`. Using regex for URL assertions avoids this protocol mismatch
+  - When host pages use `AppLayout`, the user's name appears in both the sidebar and main content — use `page.getByRole('main')` to scope assertions to the player list
+  - `text=/^[A-Z0-9]{5,6}$/` regex locator works well for matching dynamically generated game codes
+  - The "Create Game" form defaults to 1 round — no need to explicitly select a radio button for the basic flow
 ---

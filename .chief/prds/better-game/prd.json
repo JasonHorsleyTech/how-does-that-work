@@ -108,7 +108,7 @@
         "Test verifies the host appears in the player list"
       ],
       "priority": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-008",
