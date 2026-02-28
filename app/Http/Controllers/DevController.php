@@ -7,6 +7,7 @@ use App\Models\Player;
 use App\Models\Turn;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 
 class DevController extends Controller
@@ -104,6 +105,17 @@ class DevController extends Controller
         }
 
         return redirect("/games/{$game->code}/complete");
+    }
+
+    public function freshDatabase()
+    {
+        if (app()->environment('production')) {
+            abort(404);
+        }
+
+        Artisan::call('migrate:fresh', ['--seed' => true]);
+
+        return redirect()->route('dev.index')->with('status', 'Database has been reset and seeded.');
     }
 
     private function randomGuestName(): string
