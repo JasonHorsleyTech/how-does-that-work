@@ -32,7 +32,10 @@ export interface GameState {
  * Returns { state, start, stop } — caller is responsible for calling start/stop
  * (typically in onMounted / onUnmounted).
  */
-export function useGameState(code: string, onStateChange?: (state: GameState) => void) {
+export function useGameState(
+    code: string,
+    onStateChange?: (state: GameState) => void,
+) {
     const state = ref<GameState | null>(null);
     const lastUpdated = ref<string | null>(null);
     let intervalId: ReturnType<typeof setInterval> | null = null;

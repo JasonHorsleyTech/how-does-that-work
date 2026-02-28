@@ -74,10 +74,13 @@ describe('useGameState', () => {
         const fetchMock = vi.fn().mockImplementation(() => {
             call++;
             const lastUpdated =
-                call === 1 ? '2026-02-24T12:00:00.000000Z' : '2026-02-24T12:00:01.000000Z';
+                call === 1
+                    ? '2026-02-24T12:00:00.000000Z'
+                    : '2026-02-24T12:00:01.000000Z';
             return Promise.resolve({
                 ok: true,
-                json: () => Promise.resolve(makeState({ last_updated: lastUpdated })),
+                json: () =>
+                    Promise.resolve(makeState({ last_updated: lastUpdated })),
             });
         });
         vi.stubGlobal('fetch', fetchMock);
@@ -96,7 +99,9 @@ describe('useGameState', () => {
     });
 
     it('does not call onStateChange when last_updated is unchanged', async () => {
-        const fetchMock = mockFetchWith(makeState({ last_updated: '2026-02-24T12:00:00.000000Z' }));
+        const fetchMock = mockFetchWith(
+            makeState({ last_updated: '2026-02-24T12:00:00.000000Z' }),
+        );
         vi.stubGlobal('fetch', fetchMock);
 
         const onStateChange = vi.fn();

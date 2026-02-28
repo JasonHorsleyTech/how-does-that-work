@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { Button } from '@/components/ui/button';
 import { Link } from '@inertiajs/vue3';
-import { type BreadcrumbItem } from '@/types';
+import { Button } from '@/components/ui/button';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
+import { type BreadcrumbItem } from '@/types';
 
 defineProps<{
     credits: number;
@@ -25,14 +25,19 @@ const breadcrumbs: BreadcrumbItem[] = [
             <div class="w-full max-w-md space-y-6 text-center">
                 <div class="text-6xl">🎉</div>
                 <div>
-                    <h1 class="text-3xl font-bold tracking-tight">Payment Successful!</h1>
+                    <h1 class="text-3xl font-bold tracking-tight">
+                        Payment Successful!
+                    </h1>
                     <p class="mt-2 text-muted-foreground">
-                        {{ creditsAdded }} credits have been added to your account.
+                        {{ creditsAdded }} credits have been added to your
+                        account.
                     </p>
                 </div>
 
                 <div class="rounded-xl border p-6">
-                    <p class="text-sm text-muted-foreground">New Credit Balance</p>
+                    <p class="text-sm text-muted-foreground">
+                        New Credit Balance
+                    </p>
                     <p class="text-4xl font-bold">{{ credits }}</p>
                 </div>
 

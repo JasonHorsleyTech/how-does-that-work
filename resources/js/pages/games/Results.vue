@@ -3,8 +3,8 @@ import { Head, useForm } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted } from 'vue';
 
 import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
 import { dashboard } from '@/routes';
+import { type BreadcrumbItem } from '@/types';
 
 const props = defineProps<{
     game: {
@@ -38,10 +38,15 @@ const props = defineProps<{
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: dashboard().url },
-    { title: `Game — ${props.game.code}`, href: `/games/${props.game.code}/play` },
+    {
+        title: `Game — ${props.game.code}`,
+        href: `/games/${props.game.code}/play`,
+    },
 ];
 
-const gradingFailed = computed(() => props.turn.status === 'grading_failed' || props.turn.grade === null);
+const gradingFailed = computed(
+    () => props.turn.status === 'grading_failed' || props.turn.grade === null,
+);
 
 const gradeBadgeClass = computed(() => {
     switch (props.turn.grade) {
@@ -112,15 +117,26 @@ onUnmounted(() => {
         <div class="flex flex-1 flex-col items-center justify-center p-6">
             <div class="w-full max-w-2xl space-y-6">
                 <div class="text-center">
-                    <p class="text-sm font-medium text-muted-foreground">Round {{ game.current_round }}</p>
-                    <h1 class="mt-1 text-3xl font-bold tracking-tight">Turn Results</h1>
+                    <p class="text-sm font-medium text-muted-foreground">
+                        Round {{ game.current_round }}
+                    </p>
+                    <h1 class="mt-1 text-3xl font-bold tracking-tight">
+                        Turn Results
+                    </h1>
                 </div>
 
                 <!-- Grading failed state -->
-                <div v-if="gradingFailed" class="rounded-xl border p-8 text-center">
+                <div
+                    v-if="gradingFailed"
+                    class="rounded-xl border p-8 text-center"
+                >
                     <p class="text-xl font-bold">{{ turn.player_name }}</p>
-                    <p class="mt-1 text-muted-foreground">{{ turn.topic_text }}</p>
-                    <p class="mt-4 text-amber-600">Grading failed — no score awarded</p>
+                    <p class="mt-1 text-muted-foreground">
+                        {{ turn.topic_text }}
+                    </p>
+                    <p class="mt-4 text-amber-600">
+                        Grading failed — no score awarded
+                    </p>
                 </div>
 
                 <!-- Graded results -->
@@ -128,13 +144,24 @@ onUnmounted(() => {
                     <!-- Player & topic header -->
                     <div class="rounded-xl border p-6 text-center">
                         <p class="text-xl font-bold">{{ turn.player_name }}</p>
-                        <p class="mt-1 text-muted-foreground">explained: <span class="font-medium text-foreground">{{ turn.topic_text }}</span></p>
+                        <p class="mt-1 text-muted-foreground">
+                            explained:
+                            <span class="font-medium text-foreground">{{
+                                turn.topic_text
+                            }}</span>
+                        </p>
                     </div>
 
                     <!-- Grade & score -->
-                    <div class="flex items-center justify-center gap-6 rounded-xl border p-6">
+                    <div
+                        class="flex items-center justify-center gap-6 rounded-xl border p-6"
+                    >
                         <div class="text-center">
-                            <p class="text-sm font-medium uppercase tracking-wide text-muted-foreground">Grade</p>
+                            <p
+                                class="text-sm font-medium tracking-wide text-muted-foreground uppercase"
+                            >
+                                Grade
+                            </p>
                             <span
                                 class="mt-1 inline-block rounded-lg border-2 px-6 py-2 text-4xl font-bold"
                                 :class="gradeBadgeClass"
@@ -143,38 +170,71 @@ onUnmounted(() => {
                             </span>
                         </div>
                         <div class="text-center">
-                            <p class="text-sm font-medium uppercase tracking-wide text-muted-foreground">Score</p>
-                            <p class="mt-1 text-4xl font-bold">{{ turn.score }}<span class="text-xl text-muted-foreground">/100</span></p>
+                            <p
+                                class="text-sm font-medium tracking-wide text-muted-foreground uppercase"
+                            >
+                                Score
+                            </p>
+                            <p class="mt-1 text-4xl font-bold">
+                                {{ turn.score
+                                }}<span class="text-xl text-muted-foreground"
+                                    >/100</span
+                                >
+                            </p>
                         </div>
                     </div>
 
                     <!-- Feedback -->
                     <div class="rounded-xl border p-6">
-                        <p class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Feedback</p>
+                        <p
+                            class="text-sm font-semibold tracking-wide text-muted-foreground uppercase"
+                        >
+                            Feedback
+                        </p>
                         <p class="mt-2 leading-relaxed">{{ turn.feedback }}</p>
                     </div>
 
                     <!-- Actual explanation -->
                     <div class="rounded-xl border p-6">
-                        <p class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">The Real Answer</p>
-                        <p class="mt-2 leading-relaxed">{{ turn.actual_explanation }}</p>
+                        <p
+                            class="text-sm font-semibold tracking-wide text-muted-foreground uppercase"
+                        >
+                            The Real Answer
+                        </p>
+                        <p class="mt-2 leading-relaxed">
+                            {{ turn.actual_explanation }}
+                        </p>
                     </div>
                 </div>
 
                 <!-- Scoreboard -->
                 <div class="rounded-xl border p-6">
-                    <p class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Scoreboard</p>
+                    <p
+                        class="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase"
+                    >
+                        Scoreboard
+                    </p>
                     <ol class="space-y-2">
                         <li
                             v-for="(p, index) in players"
                             :key="p.id"
                             class="flex items-center justify-between rounded-lg px-3 py-2"
-                            :class="p.id === player.id ? 'bg-primary/10' : 'bg-muted/30'"
+                            :class="
+                                p.id === player.id
+                                    ? 'bg-primary/10'
+                                    : 'bg-muted/30'
+                            "
                         >
                             <span class="font-medium">
-                                <span class="mr-2 text-muted-foreground">{{ index + 1 }}.</span>
+                                <span class="mr-2 text-muted-foreground"
+                                    >{{ index + 1 }}.</span
+                                >
                                 {{ p.name }}
-                                <span v-if="p.is_host" class="ml-1 text-xs text-muted-foreground">(host)</span>
+                                <span
+                                    v-if="p.is_host"
+                                    class="ml-1 text-xs text-muted-foreground"
+                                    >(host)</span
+                                >
                             </span>
                             <span class="font-bold">{{ p.score }} pts</span>
                         </li>
@@ -197,18 +257,27 @@ onUnmounted(() => {
     </AppLayout>
 
     <!-- Guest / non-host view -->
-    <div v-else class="flex min-h-screen flex-col items-center justify-center bg-background p-6">
+    <div
+        v-else
+        class="flex min-h-screen flex-col items-center justify-center bg-background p-6"
+    >
         <div class="w-full max-w-2xl space-y-6">
             <div class="text-center">
-                <p class="text-sm font-medium text-muted-foreground">Round {{ game.current_round }}</p>
-                <h1 class="mt-1 text-3xl font-bold tracking-tight">Turn Results</h1>
+                <p class="text-sm font-medium text-muted-foreground">
+                    Round {{ game.current_round }}
+                </p>
+                <h1 class="mt-1 text-3xl font-bold tracking-tight">
+                    Turn Results
+                </h1>
             </div>
 
             <!-- Grading failed state -->
             <div v-if="gradingFailed" class="rounded-xl border p-8 text-center">
                 <p class="text-xl font-bold">{{ turn.player_name }}</p>
                 <p class="mt-1 text-muted-foreground">{{ turn.topic_text }}</p>
-                <p class="mt-4 text-amber-600">Grading failed — no score awarded</p>
+                <p class="mt-4 text-amber-600">
+                    Grading failed — no score awarded
+                </p>
             </div>
 
             <!-- Graded results -->
@@ -216,13 +285,24 @@ onUnmounted(() => {
                 <!-- Player & topic header -->
                 <div class="rounded-xl border p-6 text-center">
                     <p class="text-xl font-bold">{{ turn.player_name }}</p>
-                    <p class="mt-1 text-muted-foreground">explained: <span class="font-medium text-foreground">{{ turn.topic_text }}</span></p>
+                    <p class="mt-1 text-muted-foreground">
+                        explained:
+                        <span class="font-medium text-foreground">{{
+                            turn.topic_text
+                        }}</span>
+                    </p>
                 </div>
 
                 <!-- Grade & score -->
-                <div class="flex items-center justify-center gap-6 rounded-xl border p-6">
+                <div
+                    class="flex items-center justify-center gap-6 rounded-xl border p-6"
+                >
                     <div class="text-center">
-                        <p class="text-sm font-medium uppercase tracking-wide text-muted-foreground">Grade</p>
+                        <p
+                            class="text-sm font-medium tracking-wide text-muted-foreground uppercase"
+                        >
+                            Grade
+                        </p>
                         <span
                             class="mt-1 inline-block rounded-lg border-2 px-6 py-2 text-4xl font-bold"
                             :class="gradeBadgeClass"
@@ -231,38 +311,69 @@ onUnmounted(() => {
                         </span>
                     </div>
                     <div class="text-center">
-                        <p class="text-sm font-medium uppercase tracking-wide text-muted-foreground">Score</p>
-                        <p class="mt-1 text-4xl font-bold">{{ turn.score }}<span class="text-xl text-muted-foreground">/100</span></p>
+                        <p
+                            class="text-sm font-medium tracking-wide text-muted-foreground uppercase"
+                        >
+                            Score
+                        </p>
+                        <p class="mt-1 text-4xl font-bold">
+                            {{ turn.score
+                            }}<span class="text-xl text-muted-foreground"
+                                >/100</span
+                            >
+                        </p>
                     </div>
                 </div>
 
                 <!-- Feedback -->
                 <div class="rounded-xl border p-6">
-                    <p class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Feedback</p>
+                    <p
+                        class="text-sm font-semibold tracking-wide text-muted-foreground uppercase"
+                    >
+                        Feedback
+                    </p>
                     <p class="mt-2 leading-relaxed">{{ turn.feedback }}</p>
                 </div>
 
                 <!-- Actual explanation -->
                 <div class="rounded-xl border p-6">
-                    <p class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">The Real Answer</p>
-                    <p class="mt-2 leading-relaxed">{{ turn.actual_explanation }}</p>
+                    <p
+                        class="text-sm font-semibold tracking-wide text-muted-foreground uppercase"
+                    >
+                        The Real Answer
+                    </p>
+                    <p class="mt-2 leading-relaxed">
+                        {{ turn.actual_explanation }}
+                    </p>
                 </div>
             </div>
 
             <!-- Scoreboard -->
             <div class="rounded-xl border p-6">
-                <p class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Scoreboard</p>
+                <p
+                    class="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase"
+                >
+                    Scoreboard
+                </p>
                 <ol class="space-y-2">
                     <li
                         v-for="(p, index) in players"
                         :key="p.id"
                         class="flex items-center justify-between rounded-lg px-3 py-2"
-                        :class="p.id === player.id ? 'bg-primary/10' : 'bg-muted/30'"
+                        :class="
+                            p.id === player.id ? 'bg-primary/10' : 'bg-muted/30'
+                        "
                     >
                         <span class="font-medium">
-                            <span class="mr-2 text-muted-foreground">{{ index + 1 }}.</span>
+                            <span class="mr-2 text-muted-foreground"
+                                >{{ index + 1 }}.</span
+                            >
                             {{ p.name }}
-                            <span v-if="p.is_host" class="ml-1 text-xs text-muted-foreground">(host)</span>
+                            <span
+                                v-if="p.is_host"
+                                class="ml-1 text-xs text-muted-foreground"
+                                >(host)</span
+                            >
                         </span>
                         <span class="font-bold">{{ p.score }} pts</span>
                     </li>
@@ -271,7 +382,9 @@ onUnmounted(() => {
 
             <!-- Non-host waiting message -->
             <div class="rounded-xl border p-4 text-center">
-                <p class="text-muted-foreground">Waiting for host to continue…</p>
+                <p class="text-muted-foreground">
+                    Waiting for host to continue…
+                </p>
             </div>
         </div>
     </div>

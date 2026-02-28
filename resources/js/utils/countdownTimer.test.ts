@@ -13,14 +13,22 @@ describe('createCountdownTimer', () => {
 
     it('calls onTick immediately on start with full duration', () => {
         const ticks: number[] = [];
-        const timer = createCountdownTimer(5, (s) => ticks.push(s), () => {});
+        const timer = createCountdownTimer(
+            5,
+            (s) => ticks.push(s),
+            () => {},
+        );
         timer.start();
         expect(ticks).toEqual([5]);
     });
 
     it('counts down one second at a time', () => {
         const ticks: number[] = [];
-        const timer = createCountdownTimer(3, (s) => ticks.push(s), () => {});
+        const timer = createCountdownTimer(
+            3,
+            (s) => ticks.push(s),
+            () => {},
+        );
         timer.start();
         vi.advanceTimersByTime(3000);
         expect(ticks).toEqual([3, 2, 1, 0]);
@@ -44,7 +52,11 @@ describe('createCountdownTimer', () => {
 
     it('stops counting down after stop() is called', () => {
         const ticks: number[] = [];
-        const timer = createCountdownTimer(5, (s) => ticks.push(s), () => {});
+        const timer = createCountdownTimer(
+            5,
+            (s) => ticks.push(s),
+            () => {},
+        );
         timer.start();
         vi.advanceTimersByTime(2000);
         timer.stop();
@@ -64,7 +76,11 @@ describe('createCountdownTimer', () => {
 
     it('start() is idempotent — calling twice does not double-tick', () => {
         const ticks: number[] = [];
-        const timer = createCountdownTimer(3, (s) => ticks.push(s), () => {});
+        const timer = createCountdownTimer(
+            3,
+            (s) => ticks.push(s),
+            () => {},
+        );
         timer.start();
         timer.start();
         vi.advanceTimersByTime(1000);
