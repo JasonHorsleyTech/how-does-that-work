@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import QRCode from 'qrcode';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import PollIndicator from '@/components/PollIndicator.vue';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -30,11 +30,6 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const qrDataUrl = ref<string>('');
 const players = ref([...props.game.players]);
-const nonHostCount = computed(
-    () => players.value.filter((p) => !p.is_host).length,
-);
-const canStart = computed(() => nonHostCount.value >= 2);
-
 const startForm = useForm({});
 
 function startSubmission() {
@@ -199,7 +194,7 @@ async function pollPlayers() {
                 <div class="pt-2">
                     <Button
                         class="w-full"
-                        :disabled="!canStart || startForm.processing"
+                        :disabled="startForm.processing"
                         @click="startSubmission"
                     >
                         {{
@@ -208,12 +203,6 @@ async function pollPlayers() {
                                 : 'Start Submission Phase'
                         }}
                     </Button>
-                    <p
-                        v-if="!canStart"
-                        class="mt-2 text-center text-sm text-muted-foreground"
-                    >
-                        Waiting for at least 2 players to join…
-                    </p>
                 </div>
             </div>
         </div>

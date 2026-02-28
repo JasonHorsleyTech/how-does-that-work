@@ -112,11 +112,6 @@ class GameController extends Controller
             return back()->withErrors(['game' => 'Game is not in lobby status.']);
         }
 
-        $nonHostCount = $game->players()->where('is_host', false)->count();
-        if ($nonHostCount < 2) {
-            return back()->withErrors(['game' => 'At least 2 non-host players must join before starting.']);
-        }
-
         $game->update([
             'status' => 'submitting',
             'state_updated_at' => now(),

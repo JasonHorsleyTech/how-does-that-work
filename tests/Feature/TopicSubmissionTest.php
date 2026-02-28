@@ -24,7 +24,20 @@ test('host can start the submission phase', function () {
     $this->assertDatabaseHas('games', ['id' => $game->id, 'status' => 'submitting']);
 });
 
-test('host cannot start submission with fewer than 2 non-host players', function () {
+test('host can start submission solo with 0 non-host players', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $game = Game::factory()->create(['host_user_id' => $user->id, 'status' => 'lobby']);
+    Player::factory()->create(['game_id' => $game->id, 'user_id' => $user->id, 'is_host' => true]);
+
+    $response = $this->post(route('games.start-submission', ['code' => $game->code]));
+
+    $response->assertRedirect("/games/{$game->code}/submit");
+    $this->assertDatabaseHas('games', ['id' => $game->id, 'status' => 'submitting']);
+});
+
+test('host can start submission with 1 non-host player', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
 
@@ -34,8 +47,8 @@ test('host cannot start submission with fewer than 2 non-host players', function
 
     $response = $this->post(route('games.start-submission', ['code' => $game->code]));
 
-    $response->assertSessionHasErrors('game');
-    $this->assertDatabaseHas('games', ['id' => $game->id, 'status' => 'lobby']);
+    $response->assertRedirect("/games/{$game->code}/submit");
+    $this->assertDatabaseHas('games', ['id' => $game->id, 'status' => 'submitting']);
 });
 
 test('non-host cannot start submission phase', function () {
