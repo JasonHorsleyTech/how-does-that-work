@@ -118,3 +118,19 @@
   - The settings Profile page uses `SettingsLayout` which provides sidebar nav and content area; sections within the slot are separated by the `space-y-12` on the parent `<section>` element
   - The Billing page already exists at `/billing` with full credit display and Stripe purchase flow — Profile page just needs a summary + link
 ---
+
+## 2026-02-28 - US-008
+- Added game history review page for hosts at `/games/{code}/review`
+- Backend: Added `GameController::review()` method — verifies authenticated host, loads all completed turns with player/topic relationships, returns transcript, grade, score, feedback, actual_explanation
+- Frontend: Created `resources/js/pages/games/Review.vue` — AppLayout page showing game summary, winner banner, final scores, and all turns organized by round with full details (transcript, feedback, real answer)
+- Dashboard: Added "Review" button for completed games in the games table (shows when `status === 'complete'`, replaces the "Rejoin" button slot)
+- Route: Added `GET /games/{code}/review` in the auth+verified middleware group
+- Authorization: Host-only access (403 for non-host users), redirects to lobby for non-complete games
+- Tests: Added 6 tests in `GameReviewTest.php` covering host access, turn data completeness, score sorting, non-host rejection, unauthenticated rejection, and non-complete game redirect
+- Files changed: `app/Http/Controllers/GameController.php`, `routes/web.php`, `resources/js/pages/games/Review.vue` (new), `resources/js/pages/Dashboard.vue`, `tests/Feature/GameReviewTest.php` (new), `.chief/prds/flow-improvements/prd.json`
+- **Learnings for future iterations:**
+  - The `complete()` method in TurnController already queries turns with player/topic relationships — the review page follows the same pattern but adds transcript, feedback, actual_explanation to the returned data
+  - The Dashboard already serves as the "game history list" — completed games show with code, date, and player count; adding a "Review" button for completed games satisfies the AC without needing a separate history list page
+  - The review page is host-only (auth required), unlike Complete.vue which allows guest access via session — this simplifies the template to a single AppLayout view
+  - The route is placed in the `auth+verified` middleware group (not the `RedirectToGameState` middleware group) since it's a post-game review page, not a live game state page
+---
