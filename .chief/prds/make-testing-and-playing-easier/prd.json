@@ -1,0 +1,52 @@
+{
+  "project": "Make Testing and Playing Easier",
+  "description": "The current game has several validation restrictions that made sense as defaults but create friction in practice — both for the developer testing the game and for friends playing it casually. Password rules are overkill for a party game, topic character minimums get in the way of quick testing, and the minimum player requirement makes it impossible to test the game solo. This PRD addresses all three by relaxing these constraints to match the actual use case: a fun game shown to friends, not a bank.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Relax Password Requirements",
+      "description": "As a user signing up, I want to use a simple password so that I can get into the game quickly without fighting password rules.",
+      "acceptanceCriteria": [
+        "Password minimum length is reduced to 4 characters (from 12)",
+        "All complexity requirements are removed (no mixed case, no numbers, no symbols, no uncompromised check) — in both production and development",
+        "Password confirmation is still required",
+        "Registration, password reset, and password change all use the new relaxed rules",
+        "Existing tests are updated to reflect the new minimum (4 characters)",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Remove Topic Minimum Character Limit",
+      "description": "As a player (or developer testing), I want to submit short topics like \"1\" or \"hi\" so that I can play quickly without being forced to think of longer text.",
+      "acceptanceCriteria": [
+        "Topic minimum character validation is reduced to 1 character (from 5) on the backend",
+        "Topic minimum character validation is reduced to 1 character on the frontend (HTML minlength attribute)",
+        "Maximum character limit (120) remains unchanged",
+        "The requirement to submit exactly 3 topics remains unchanged",
+        "Existing tests are updated to reflect the new minimum (1 character)",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false
+    },
+    {
+      "id": "US-003",
+      "title": "Remove Minimum Player Requirement to Start a Game",
+      "description": "As the host (or a developer testing solo), I want to start a game with any number of players — even just myself — so that I can test the full game flow without needing to open extra browsers.",
+      "acceptanceCriteria": [
+        "The host can start the submission phase with 0 non-host players (solo)",
+        "The host can start the submission phase with 1 non-host player",
+        "The backend validation in startSubmission() no longer rejects games with fewer than 2 non-host players",
+        "The frontend \"Start\" button is always enabled (not gated on player count)",
+        "The \"Waiting for at least 2 players to join…\" message is removed",
+        "Existing tests are updated to allow starting with fewer than 2 non-host players",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false
+    }
+  ]
+}
