@@ -114,6 +114,7 @@ test('submit page passes null hostCredits to guests', function () {
 
 // Stripe webhook — increments user credits on checkout.session.completed
 test('stripe webhook increments user credits on checkout.session.completed', function () {
+    config(['cashier.webhook.secret' => null]);
     $user = User::factory()->create(['credits' => 0]);
 
     $payload = json_encode([
@@ -137,6 +138,7 @@ test('stripe webhook increments user credits on checkout.session.completed', fun
 });
 
 test('stripe webhook ignores unknown event types', function () {
+    config(['cashier.webhook.secret' => null]);
     $user = User::factory()->create(['credits' => 50]);
 
     $response = $this->postJson('/stripe/webhook', [
@@ -153,6 +155,7 @@ test('stripe webhook ignores unknown event types', function () {
 });
 
 test('stripe webhook handles missing client_reference_id gracefully', function () {
+    config(['cashier.webhook.secret' => null]);
     $response = $this->postJson('/stripe/webhook', [
         'type' => 'checkout.session.completed',
         'data' => [
@@ -166,6 +169,7 @@ test('stripe webhook handles missing client_reference_id gracefully', function (
 });
 
 test('stripe webhook handles non-existent user gracefully', function () {
+    config(['cashier.webhook.secret' => null]);
     $response = $this->postJson('/stripe/webhook', [
         'type' => 'checkout.session.completed',
         'data' => [
