@@ -31,8 +31,7 @@
         "The upload button is only visible during the active player's recording phase, not after audio is already submitted"
       ],
       "priority": 2,
-      "passes": true,
-      "inProgress": true
+      "passes": true
     },
     {
       "id": "US-003",
@@ -48,7 +47,7 @@
         "Performance: visualizer runs at ~30fps without janking the recording or countdown timer"
       ],
       "priority": 3,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-004",

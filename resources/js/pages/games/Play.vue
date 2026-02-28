@@ -2,6 +2,7 @@
 import { Head, useForm } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
+import AudioVisualizer from '@/components/AudioVisualizer.vue';
 import JoinLinkPanel from '@/components/JoinLinkPanel.vue';
 import PollIndicator from '@/components/PollIndicator.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -95,7 +96,7 @@ let micCheckInterval: ReturnType<typeof setInterval> | null = null;
 let activeRecordingTimer: CountdownTimer | null = null;
 let nonActiveRecordingTimer: CountdownTimer | null = null;
 let mediaRecorder: MediaRecorder | null = null;
-let recordingStream: MediaStream | null = null;
+const recordingStream = ref<MediaStream | null>(null);
 let audioChunks: Blob[] = [];
 
 // Host audio upload fallback
@@ -254,7 +255,7 @@ async function startMyTurn() {
 
     // Attempt to start MediaRecorder
     try {
-        recordingStream = await navigator.mediaDevices.getUserMedia({
+        recordingStream.value = await navigator.mediaDevices.getUserMedia({
             audio: true,
             video: false,
         });
@@ -263,7 +264,7 @@ async function startMyTurn() {
             ? 'audio/webm'
             : '';
         mediaRecorder = new MediaRecorder(
-            recordingStream,
+            recordingStream.value,
             mimeType ? { mimeType } : undefined,
         );
         mediaRecorder.ondataavailable = (e) => {
@@ -304,9 +305,9 @@ async function stopAndUploadRecording() {
         });
     }
 
-    if (recordingStream) {
-        recordingStream.getTracks().forEach((t) => t.stop());
-        recordingStream = null;
+    if (recordingStream.value) {
+        recordingStream.value.getTracks().forEach((t) => t.stop());
+        recordingStream.value = null;
     }
 
     recordingPhase.value = 'uploading';
@@ -371,7 +372,7 @@ onUnmounted(() => {
     if (activeRecordingTimer) activeRecordingTimer.stop();
     if (mediaRecorder && mediaRecorder.state !== 'inactive')
         mediaRecorder.stop();
-    if (recordingStream) recordingStream.getTracks().forEach((t) => t.stop());
+    if (recordingStream.value) recordingStream.value.getTracks().forEach((t) => t.stop());
 });
 
 // Handle in-page transition from choosing → recording (Inertia SPA update)
@@ -738,6 +739,12 @@ async function pollState() {
                         {{ currentTurn.chosen_topic_text }}
                     </p>
                 </div>
+
+                <!-- Audio visualizer -->
+                <AudioVisualizer
+                    v-if="recordingStream"
+                    :stream="recordingStream"
+                />
 
                 <!-- Timer -->
                 <div class="text-center">

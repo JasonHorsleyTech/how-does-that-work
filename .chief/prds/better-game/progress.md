@@ -10,6 +10,8 @@
 - `storeAudio` validates player owns the turn; `hostUploadAudio` validates user is the host — separate authorization paths
 - Host upload accepts multiple audio formats (mp3, wav, webm, m4a, ogg) via Laravel `mimes` validation
 - Multiple `ref="..."` in mutually exclusive `v-if`/`v-else-if` blocks works fine in Vue 3 — only one instance rendered at a time
+- `AudioVisualizer.vue` component: pass a `MediaStream`, renders frequency bars. Use `getByteFrequencyData` for bars, `fftSize: 64`, `smoothingTimeConstant: 0.7`
+- When passing a variable to a child component as a prop, it must be a `ref` — convert `let` variables to `ref()` if needed
 
 ---
 
@@ -42,4 +44,21 @@
   - Host upload needs to handle the case where turn is still in 'choosing' — auto-selecting a topic avoids breaking the transcription/grading pipeline
   - Hidden file input + ref click pattern works well for custom upload buttons in Vue
   - The `state_updated_at` touch on the game is critical — it invalidates the polling cache so all clients pick up the state change
+---
+
+## 2026-02-27 - US-003
+- Implemented audio visualizer during recording phase
+- Created `AudioVisualizer.vue` component that uses Web Audio API `AnalyserNode` with `getByteFrequencyData` for frequency-based bars
+- Component accepts a `MediaStream` prop, creates its own AudioContext + AnalyserNode, animates at ~30fps via throttled `requestAnimationFrame`
+- 7 vertical bars with smooth transitions, styled with Tailwind (`bg-primary`, rounded, gap-1.5)
+- Integrated into the active player's recording view in `Play.vue`, between the topic text and countdown timer
+- Only renders on the recording player's phone (guarded by `isActivePlayer && recordingPhase === 'recording'`), not visible to host or other players
+- Changed `recordingStream` from `let` to `ref<MediaStream | null>` so it's reactive and can be passed to the visualizer component
+- Files changed: `resources/js/components/AudioVisualizer.vue` (new), `resources/js/pages/games/Play.vue`
+- **Learnings for future iterations:**
+  - `getByteFrequencyData` gives better visual results for bars than `getByteTimeDomainData` (which is better for waveforms)
+  - `fftSize: 64` keeps the bin count low (32 bins) which is ideal for a small number of visualizer bars
+  - `smoothingTimeConstant: 0.7` prevents bars from being too jittery while still being responsive
+  - When a non-ref variable (like `recordingStream`) needs to be passed to a child component as a prop, convert it to a `ref` so Vue's reactivity system can track it
+  - CSS `transition-[height] duration-75` on bars provides smooth animation without needing JS-driven transitions
 ---
