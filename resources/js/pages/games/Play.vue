@@ -13,6 +13,7 @@ import {
     createCountdownTimer,
     type CountdownTimer,
 } from '@/utils/countdownTimer';
+import { gradingJokes } from '@/utils/gradingJokes';
 
 const props = defineProps<{
     game: {
@@ -98,6 +99,32 @@ let nonActiveRecordingTimer: CountdownTimer | null = null;
 let mediaRecorder: MediaRecorder | null = null;
 const recordingStream = ref<MediaStream | null>(null);
 let audioChunks: Blob[] = [];
+
+// Grading jokes rotation
+const currentJokeIndex = ref(0);
+const jokeVisible = ref(true);
+let jokeInterval: ReturnType<typeof setInterval> | null = null;
+
+function startJokeRotation() {
+    if (jokeInterval) return;
+    currentJokeIndex.value = Math.floor(Math.random() * gradingJokes.length);
+    jokeVisible.value = true;
+    jokeInterval = setInterval(() => {
+        jokeVisible.value = false;
+        setTimeout(() => {
+            currentJokeIndex.value =
+                (currentJokeIndex.value + 1) % gradingJokes.length;
+            jokeVisible.value = true;
+        }, 400);
+    }, 4500);
+}
+
+function stopJokeRotation() {
+    if (jokeInterval) {
+        clearInterval(jokeInterval);
+        jokeInterval = null;
+    }
+}
 
 // Host audio upload fallback
 const hostUploadInput = ref<HTMLInputElement | null>(null);
@@ -369,10 +396,20 @@ onUnmounted(() => {
     if (countdownTimer) clearInterval(countdownTimer);
     if (nonActiveRecordingTimer) nonActiveRecordingTimer.stop();
     stopMicStream();
+    stopJokeRotation();
     if (activeRecordingTimer) activeRecordingTimer.stop();
     if (mediaRecorder && mediaRecorder.state !== 'inactive')
         mediaRecorder.stop();
     if (recordingStream.value) recordingStream.value.getTracks().forEach((t) => t.stop());
+});
+
+// Start joke rotation when grading begins
+watch(recordingPhase, (phase) => {
+    if (phase === 'done') {
+        startJokeRotation();
+    } else {
+        stopJokeRotation();
+    }
 });
 
 // Handle in-page transition from choosing → recording (Inertia SPA update)
@@ -804,8 +841,11 @@ async function pollState() {
                 class="rounded-xl border p-8 text-center"
             >
                 <p class="text-lg font-semibold">Great job!</p>
-                <p class="mt-2 text-muted-foreground">
-                    Your explanation is being graded…
+                <p
+                    class="mt-4 text-sm text-muted-foreground transition-opacity duration-300"
+                    :class="jokeVisible ? 'opacity-100' : 'opacity-0'"
+                >
+                    {{ gradingJokes[currentJokeIndex] }}
                 </p>
             </div>
 
