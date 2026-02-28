@@ -266,3 +266,19 @@
   - The completed game test does NOT need `test.describe.serial` since it doesn't modify game state (doesn't click "Play Again")
   - Winner banner text uses interpolation like "Rapid Owl wins with 92.0 points!" — match with regex `/Rapid Owl.*wins/` to be flexible
 ---
+
+## 2026-02-27 - US-017
+- Added "guest player reconnects after page refresh" E2E test in `tests/e2e/game-flow.spec.ts`
+- Test logs in as Sneaky Ferret (Player 5) — a guest player on the PLAYNG game (playing status)
+- Verifies the play page loads at `/games/PLAYNG/play` with game content ("How Does That Work?" heading, active player choosing text)
+- Refreshes the page with `page.reload()`
+- Verifies the player is still on the correct game page (not kicked back to join) with same content visible
+- Added constants: `PLAYING_GUEST_PLAYER = 5` and `PLAYING_CODE = 'PLAYNG'`
+- All 19 E2E tests pass in ~5.4s
+- Files changed: `tests/e2e/game-flow.spec.ts`, `.chief/prds/better-game/prd.json`
+- **Learnings for future iterations:**
+  - Non-active guest players on the play page do NOT see their own name — they see "{Active Player} is choosing their topic…" or similar waiting text
+  - The PLAYNG game is safe for parallel tests — no other test modifies its state
+  - Use `/is choosing their topic/` regex for the non-active player assertion since the active player name may vary
+  - Guest player session is stored server-side via `session()->put("player_id.{code}", playerId)` — `page.reload()` preserves the session cookie so reconnection works
+---

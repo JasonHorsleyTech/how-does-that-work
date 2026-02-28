@@ -235,7 +235,7 @@
         "Test verifies the player is still in the game and on the correct page (not kicked back to join)"
       ],
       "priority": 8,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-018",

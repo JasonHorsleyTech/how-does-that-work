@@ -13,6 +13,7 @@ const HOST_VETERAN = 5; // host-veteran@dev.test — completed game (COMPLT)
 
 // Deterministic player IDs from DevSeeder (guest players for login-as-player route)
 const CHOOSING_ACTIVE_PLAYER = 18; // Jolly Panda — active player on CHOOSE game (choosing state)
+const PLAYING_GUEST_PLAYER = 5; // Sneaky Ferret — guest player on PLAYNG game (playing state)
 
 // Deterministic game codes from DevSeeder
 const LOBBY_CODE = 'LOBBY1';
@@ -22,6 +23,7 @@ const CHOOSE_CODE = 'CHOOSE';
 const GRADED_CODE = 'GRADED';
 const ROUND_DONE_CODE = 'RNDDNE';
 const COMPLETE_CODE = 'COMPLT';
+const PLAYING_CODE = 'PLAYNG';
 
 test('host creates a new game from dashboard', async ({ page }) => {
     await loginAs(page, HOST_STANDARD);
@@ -179,6 +181,26 @@ test('host reconnects from dashboard via Rejoin button', async ({ page }) => {
     await rejoinLink.click();
 
     await expectUrl(page, `/games/${CHOOSE_CODE}/play`);
+});
+
+test('guest player reconnects after page refresh', async ({ page }) => {
+    // Log in as Sneaky Ferret — a guest player on the playing game PLAYNG
+    await loginAsPlayer(page, PLAYING_GUEST_PLAYER);
+    await expectUrl(page, `/games/${PLAYING_CODE}/play`);
+
+    // Verify the play page loaded with game content (non-active player sees waiting text)
+    await expect(page.getByText('How Does That Work?')).toBeVisible();
+    await expect(page.getByText(/is choosing their topic/)).toBeVisible();
+
+    // Refresh the page
+    await page.reload();
+
+    // Verify the player is still on the correct game page (not kicked back to join)
+    await expectUrl(page, `/games/${PLAYING_CODE}/play`);
+
+    // Verify game content is still accessible after refresh
+    await expect(page.getByText('How Does That Work?')).toBeVisible();
+    await expect(page.getByText(/is choosing their topic/)).toBeVisible();
 });
 
 // Serial block: these tests share RNDDNE game state — guest refresh must run before starting next round
